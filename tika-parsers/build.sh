@@ -1,1 +1,1 @@
-mvn clean -DskipTests=true -fn install
+mvn clean -Dmaven.test.failure.ignore=true -DskipTests=true -fn install
