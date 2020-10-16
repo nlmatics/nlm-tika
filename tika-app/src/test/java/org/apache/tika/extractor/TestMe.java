@@ -31,7 +31,8 @@ public class TestMe {
         //File file = new File("/Users/reshavabraham/scp/original-docs/scp2/111 Washington Executive Summary.v.6.1.18.pdf");
         //File file = new File("/Users/reshavabraham/scp/original-docs/scp4/The Godfrey Hotel Phoenix - Oxford Capital Group +True North - Debt OM.pdf");
         //File file = new File("/Users/reshavabraham/scp/original-docs/scp1/190108 BPH DevBudget Cash-Flow Draft.pdf");
-        File file = new File("/Users/reshavabraham/work/pdf_data/nlm-data/original-docs/equities/CHP_Clean.pdf");
+        //File file = new File("/Users/reshavabraham/work/pdf_data/nlm-data/original-docs/scp1/The Sunnyside Development.pdf");
+        File file = new File("/Users/reshavabraham/work/pdf_data/nlm-data/original-docs/test2/document6.pdf");
         byte[] bytes = Files.toByteArray(file);
         AutoDetectParser tikaParser = new AutoDetectParser();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
