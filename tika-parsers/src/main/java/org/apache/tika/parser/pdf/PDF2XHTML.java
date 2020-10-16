@@ -18,8 +18,10 @@ package org.apache.tika.parser.pdf;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,6 +33,7 @@ import org.apache.pdfbox.cos.COSStream;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDFontDescriptor;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
@@ -55,14 +58,14 @@ class PDF2XHTML extends AbstractPDF2XHTML {
      * is true, this will be checked before extracting an embedded image.
      * The integer keeps track of the inlineImageCounter for that image.
      * This integer is used to identify images in the markup.
-     *
+     * 
      * This is used across the document.  To avoid infinite recursion
      * TIKA-1742, we're limiting the export to one image per page.
      */
     private Map<COSStream, Integer> processedInlineImages = new HashMap<>();
     private AtomicInteger inlineImageCounter = new AtomicInteger(0);
     PDF2XHTML(PDDocument document, ContentHandler handler, ParseContext context, Metadata metadata,
-                      PDFParserConfig config)
+              PDFParserConfig config)
             throws IOException {
         super(document, handler, context, metadata, config);
     }
@@ -132,7 +135,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
     @Override
     protected void endPage(PDPage page) throws IOException {
         try {
-            writeParagraphEnd();
+           writeParagraphEnd();
             try {
                 extractImages(page);
             } catch (IOException e) {
@@ -163,31 +166,151 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             throw first;
         }
     }
-
+    /*
+        @Override
+        protected void writeParagraphStart() throws IOException {
+            super.writeParagraphStart();
+            try {
+                System.out.println();
+                xhtml.startElement("div", "style", "position:relative;");
+            } catch (SAXException e) {
+                throw new IOException("Unable to start a paragraph", e);
+            }
+        }
+    */
     @Override
     protected void writeParagraphStart() throws IOException {
         super.writeParagraphStart();
-        try {
-            xhtml.startElement("p");
-        } catch (SAXException e) {
-            throw new IOException("Unable to start a paragraph", e);
-        }
+        //System.out.println("paragraph start");
     }
+    /*
+        @Override
+        protected void writeParagraphEnd() throws IOException {
+            super.writeParagraphEnd();
+            try {
+                xhtml.endElement("div");
+            } catch (SAXException e) {
+                throw new IOException("Unable to end a paragraph", e);
+            }
+        }
 
+     */
     @Override
     protected void writeParagraphEnd() throws IOException {
         super.writeParagraphEnd();
-        try {
-            xhtml.endElement("p");
-        } catch (SAXException e) {
-            throw new IOException("Unable to end a paragraph", e);
-        }
+        //System.out.println("paragraph end");
     }
 
+    // @Override
+    // protected void writeString(String text) throws IOException {
+    //     try {
+    //         //text = text + "tika-hack";
+    //         // text = text + "<embed charX>";
+    //         xhtml.characters(text);
+    //     } catch (SAXException e) {
+    //         throw new IOException(
+    //                 "Unable to write a string: " + text, e);
+    //     }
+    // }
+
+ 
+
     @Override
-    protected void writeString(String text) throws IOException {
+    protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
         try {
+            StringBuilder testWordStartPos = new StringBuilder();
+            ArrayList<String> wordsStartPos = new ArrayList<>(20);
+            ArrayList<String> wordsEndPos = new ArrayList<>(20);
+            ArrayList<String> wordSpaceDistanceList = new ArrayList<>(20);
+            // int wordCount = text.split("\\s+").length;
+            // String[] wordsStartPos2 = new String[wordCount];
+
+            float linePositiony = 0;
+            float linePositionx = 0;
+            String last_char_pos = "[]";
+            String height = "8";
+            String y_rel = "";
+            String font_type = "";
+            String font_weight = "normal";
+            String font_style = "normal";
+            String word_start_pos = "";
+            //xhtml.startElement("div", "style", "border:3px solid ##ff0000;");
+            String s1 = Float.toString(textPositions.get(0).getXDirAdj() * 1);
+            String indent = "text-indent:" + s1 + "px;";
+            String prev = " ";
+            String height1 = "start-font-size:" + Float.toString((float) Math.pow(textPositions.get(0).getHeightDir(), 1)) + "px;";
+            String top1 = "top1:" + Float.toString(textPositions.get(0).getYDirAdj()) + "px;";
+            String font_size = "";
+            //for (TextPosition s : textPositions) {
+            for (int i = 0; i < textPositions.size(); i ++) {
+                TextPosition s = textPositions.get(i);
+                font_size = Float.toString((float) Math.pow(s.getHeightDir(), 1));
+                height = "font-size:" + Float.toString((float) Math.pow(s.getHeightDir(), 1)) + "px;";
+                y_rel = "top:" + Float.toString(s.getYDirAdj()) + "px;";
+                linePositiony = s.getYDirAdj();
+                linePositionx = s.getXDirAdj();
+
+
+                PDFontDescriptor fd = s.getFont().getFontDescriptor();
+                font_type = fd.getFontFamily();
+                if (font_type == null) {
+                    font_type = fd.getFontName();
+
+                    if (font_type.contains("+")) {
+                        font_type = font_type.split("\\+")[1];
+                    }
+
+                    if (font_type.contains(",")) {
+                        String[] arr = font_type.split(",");
+                        if (arr[1].toLowerCase(Locale.ENGLISH).contains("bold")) {
+                            font_weight = "bold";
+                        }
+                        font_type = arr[0];
+                    }
+                }
+
+                float fw = fd.getFontWeight();
+                if (font_weight.equals("normal") && fw >= 100) {
+                    font_weight = Float.toString(fw);
+                }
+                if (fd.getItalicAngle() != 0) {
+                    font_style = "italic";
+                }
+
+                if (i+1 < textPositions.size()) {
+                    if (textPositions.get(i+1).toString().equals(" ")) {
+                        // if next char is a space save get the position of the last char of the word
+                        wordsEndPos.add("(" + linePositionx + "," + linePositiony + "," + font_size + "," +font_weight + ")");
+                    }
+                } else {
+                    // last char
+                    wordsEndPos.add("(" + linePositionx + "," + linePositiony + "," + font_size + "," +font_weight + ")");
+                }
+
+                // get start of word in format (xCoord, yCoord)
+                if (prev.equals(" ")) {
+                    //String tempWordPos = "(" + linePositionx + "," + linePositiony + ")";
+                    String tempWordPos = "(" + linePositionx + "," + linePositiony + "," + font_size + "," +font_weight + ")";
+                    testWordStartPos.append("(").append(linePositionx).append(",").append(linePositiony).append(")").append("current char: ").append(s.toString());
+                    wordsStartPos.add(tempWordPos.toString());
+                }
+
+                prev = s.toString();
+                last_char_pos = "(" + Float.toString(linePositionx) + ", " + Float.toString(linePositiony) + ")";
+            }
+            font_weight = "font-weight:" + font_weight + ";";
+            font_style = "font-style:" + font_style + ";";
+            font_type = "font-family:" + font_type + ";";
+            word_start_pos = "word-start-positions:" + wordsStartPos.toString();
+            String word_end_pos = ";word-end-positions:" + wordsEndPos.toString();
+
+            String val = top1 + height1 + height + font_type + font_style + font_weight + y_rel + "position:absolute;" +
+                    indent + word_start_pos + ";last-char:" + last_char_pos + word_end_pos;
+            //String val = height + y_rel  + indent;
+            xhtml.startElement("p", "style", val);
             xhtml.characters(text);
+            xhtml.endElement("p");
+            //xhtml.endElement("div");
         } catch (SAXException e) {
             throw new IOException(
                     "Unable to write a string: " + text, e);
