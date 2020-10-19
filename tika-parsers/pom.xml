@@ -1003,51 +1003,6 @@
           <groupId>org.eclipse.m2e</groupId>
           <artifactId>lifecycle-mapping</artifactId>
           <version>1.0.0</version>
-          <configuration>
-            <lifecycleMappingMetadata>
-              <pluginExecutions>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.apache.felix</groupId>
-                    <artifactId>maven-scr-plugin</artifactId>
-                    <versionRange>${maven.scr.version}</versionRange>
-                    <goals>
-                      <goal>scr</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <execute />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.codehaus.gmaven</groupId>
-                    <artifactId>groovy-maven-plugin</artifactId>
-                    <versionRange>${groovy.maven.version}</versionRange>
-                    <goals>
-                      <goal>execute</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                	<pluginExecutionFilter>
-                		<groupId>org.sonatype.ossindex.maven</groupId>
-                		<artifactId>ossindex-maven-plugin</artifactId>
-                		<versionRange>[3.0.4,)</versionRange>
-                		<goals>
-                			<goal>audit</goal>
-                		</goals>
-                	</pluginExecutionFilter>
-                	<action>
-                		<ignore />
-                	</action>
-                </pluginExecution>
-              </pluginExecutions>
-            </lifecycleMappingMetadata>
-          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>

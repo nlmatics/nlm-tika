@@ -376,20 +376,20 @@
           <generateBackupPoms>false</generateBackupPoms>
         </configuration>
       </plugin>
-      <plugin>
-        <groupId>org.sonatype.ossindex.maven</groupId>
-        <artifactId>ossindex-maven-plugin</artifactId>
-        <version>3.1.0</version>
-        <executions>
-          <execution>
-            <id>audit-dependencies</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>audit</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
+<!--      <plugin>-->
+<!--        <groupId>org.sonatype.ossindex.maven</groupId>-->
+<!--        <artifactId>ossindex-maven-plugin</artifactId>-->
+<!--        <version>3.1.0</version>-->
+<!--        <executions>-->
+<!--          <execution>-->
+<!--            <id>audit-dependencies</id>-->
+<!--            <phase>validate</phase>-->
+<!--            <goals>-->
+<!--              <goal>audit</goal>-->
+<!--            </goals>-->
+<!--          </execution>-->
+<!--        </executions>-->
+<!--      </plugin>-->
       <!-- example of how to ignore coordinates
                 <configuration>
                     <excludeCoordinates>
