@@ -221,6 +221,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             StringBuilder testWordStartPos = new StringBuilder();
             ArrayList<String> wordsStartPos = new ArrayList<>(20);
             ArrayList<String> wordsEndPos = new ArrayList<>(20);
+            ArrayList<String> wordsFonts = new ArrayList<>(20);
             ArrayList<String> wordSpaceDistanceList = new ArrayList<>(20);
             // int wordCount = text.split("\\s+").length;
             // String[] wordsStartPos2 = new String[wordCount];
@@ -280,21 +281,24 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                 if (i+1 < textPositions.size()) {
                     if (textPositions.get(i+1).toString().equals(" ")) {
                         // if next char is a space save get the position of the last char of the word
-                        wordsEndPos.add("(" + linePositionx + "," + linePositiony + "," + font_size + "," +font_weight + ")");
+                        wordsEndPos.add("(" + linePositionx + "," + linePositiony + ")");
+                        String font  = "(" + font_type + "," + font_style + "," + font_size + "," + font_weight + ")";
+                        wordsFonts.add(font);
                     }
                 } else {
                     // last char
-                    wordsEndPos.add("(" + linePositionx + "," + linePositiony + "," + font_size + "," +font_weight + ")");
+                    wordsEndPos.add("(" + linePositionx + "," + linePositiony + ")");
+                    String font  = "(" + font_type + "," + font_style + "," + font_size + "," + font_weight + ")";
+                    wordsFonts.add(font);
                 }
 
                 // get start of word in format (xCoord, yCoord)
                 if (prev.equals(" ")) {
                     //String tempWordPos = "(" + linePositionx + "," + linePositiony + ")";
-                    String tempWordPos = "(" + linePositionx + "," + linePositiony + "," + font_size + "," +font_weight + ")";
+                    String tempWordPos = "(" + linePositionx + "," + linePositiony + ")";
                     testWordStartPos.append("(").append(linePositionx).append(",").append(linePositiony).append(")").append("current char: ").append(s.toString());
                     wordsStartPos.add(tempWordPos.toString());
                 }
-
                 prev = s.toString();
                 last_char_pos = "(" + Float.toString(linePositionx) + ", " + Float.toString(linePositiony) + ")";
             }
@@ -303,9 +307,10 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             font_type = "font-family:" + font_type + ";";
             word_start_pos = "word-start-positions:" + wordsStartPos.toString();
             String word_end_pos = ";word-end-positions:" + wordsEndPos.toString();
+            String word_fonts = ";word-fonts:" + wordsFonts.toString();
 
             String val = top1 + height1 + height + font_type + font_style + font_weight + y_rel + "position:absolute;" +
-                    indent + word_start_pos + ";last-char:" + last_char_pos + word_end_pos;
+                    indent + word_start_pos + ";last-char:" + last_char_pos + word_end_pos + word_fonts;
             //String val = height + y_rel  + indent;
             xhtml.startElement("p", "style", val);
             xhtml.characters(text);

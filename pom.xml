@@ -90,7 +90,7 @@
             <executions>
               <execution>
                 <goals>
-                  <goal>run</goal>F
+                  <goal>run</goal>
                 </goals>
                 <phase>deploy</phase>
                 <configuration>

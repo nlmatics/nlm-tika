@@ -81,6 +81,7 @@ import org.apache.pdfbox.pdmodel.interactive.form.PDField;
 import org.apache.pdfbox.pdmodel.interactive.form.PDNonTerminalField;
 import org.apache.pdfbox.pdmodel.interactive.form.PDSignatureField;
 import org.apache.pdfbox.pdmodel.interactive.form.PDXFAResource;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.tools.imageio.ImageIOUtil;
@@ -195,7 +196,12 @@ class AbstractPDF2XHTML extends PDFTextStripper {
             //xhtml.startElement("div", "class", "page");
             xhtml.startElement("br");
             xhtml.endElement("br");
-            xhtml.startElement("div", "style", "height:900px; width:900px; position: relative;border: 3px solid #7FFFD4;padding: 10em;");
+            AttributesImpl attrs = new AttributesImpl();
+            attrs.addAttribute("", "class", "class", "CDATA", "page");
+            PDRectangle bBox = page.getBBox();
+            String pageDims = "height:" + bBox.getHeight() + "px; width:" + bBox.getWidth() + "px;";
+            attrs.addAttribute("", "style", "style", "CDATA", pageDims + " position: relative;border: 3px solid #7FFFD4;padding: 10em;");
+            xhtml.startElement("div", attrs);
         } catch (SAXException e) {
             throw new IOExceptionWithCause("Unable to start a page", e);
         }
