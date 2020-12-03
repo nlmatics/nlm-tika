@@ -23,6 +23,7 @@ import org.apache.cxf.attachment.ContentDisposition;
 import org.apache.cxf.jaxrs.ext.multipart.Attachment;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.poi.ooxml.extractor.ExtractorFactory;
 import org.apache.tika.Tika;
 import org.apache.tika.config.TikaConfig;
@@ -40,6 +41,7 @@ import org.apache.tika.parser.ParserDecorator;
 import org.apache.tika.parser.PasswordProvider;
 import org.apache.tika.parser.html.BoilerpipeContentHandler;
 import org.apache.tika.parser.ocr.TesseractOCRConfig;
+import org.apache.tika.parser.pdf.PDFParser;
 import org.apache.tika.parser.pdf.PDFParserConfig;
 import org.apache.tika.sax.BodyContentHandler;
 import org.apache.tika.sax.ExpandedTitleContentHandler;
@@ -52,6 +54,7 @@ import org.slf4j.LoggerFactory;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
+import javax.imageio.ImageIO;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -70,12 +73,12 @@ import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.transform.stream.StreamResult;
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -453,7 +456,7 @@ public class TikaResource {
     public StreamingOutput getTextFromMultipart(Attachment att, @Context final UriInfo info) {
         return produceText(att.getObject(InputStream.class), new Metadata(), att.getHeaders(), info);
     }
-    @PUT
+    @GET
     @Consumes("*/*")
     @Produces("text/plain")
     @Path("ocrFirstPage")
@@ -500,6 +503,54 @@ public class TikaResource {
         temp.delete();
 
         return content;
+    }
+
+    @GET
+    @Consumes("*/*")
+    @Produces({"image/jpeg", "image/gif", "image/png"})
+    @Path("createThumbNail")
+    public Response createThumbNail(final InputStream is, @Context HttpHeaders httpHeaders, @Context final UriInfo info) throws IOException, TikaException, SAXException {
+        BodyContentHandler handler = new BodyContentHandler();
+        Metadata metadata = new Metadata();
+        // FileInputStream inputstream = new FileInputStream(new File("/Users/reshavabraham/work/pdf_data/nlm-data/original-docs/111_Leroy_OM_FINAL.pdf"));
+
+        PDDocument pdfDoc = new PDDocument();
+        PDDocument pages = PDDocument.load(is);
+        PDPage page = pages.getPage(0);
+
+        PDDocument document = new PDDocument();
+
+        // Create a new blank page and add it to the document
+        document.addPage(page);
+
+        // Save the newly created document
+        File temp = File.createTempFile("tikafirstpage", ".txt");
+        temp.deleteOnExit();
+        document.save(temp);
+
+
+        //parsing the document using PDF parser
+        FileInputStream t = new FileInputStream(temp);
+        PDFParserConfig pdfConfig = new PDFParserConfig();
+        pdfConfig.setExtractInlineImages(true);
+        pdfConfig.setExtractUniqueInlineImagesOnly(true);
+        ParseContext context = new ParseContext();
+        context.set(PDFParserConfig.class, pdfConfig);
+
+
+        // PDDocument pdfDoc1 = new PDDocument();
+        PDDocument pdfDoc1 = PDDocument.load(temp);
+        PDFRenderer pr = new PDFRenderer (pdfDoc1);
+        BufferedImage bi = pr.renderImageWithDPI (0, 300);
+        BufferedImage image = new BufferedImage(300, 300, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        File temp_1 = File.createTempFile("thumbnail", ".jpg");
+        ImageIO.write (bi, "JPEG", temp_1);
+
+        document.close();
+
+        temp_1.deleteOnExit();
+        return Response.ok(temp_1).build();
     }
 
     //this is equivalent to text-main in tika-app
