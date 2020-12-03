@@ -21,11 +21,14 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.cxf.attachment.ContentDisposition;
 import org.apache.cxf.jaxrs.ext.multipart.Attachment;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.poi.ooxml.extractor.ExtractorFactory;
 import org.apache.tika.Tika;
 import org.apache.tika.config.TikaConfig;
 import org.apache.tika.detect.Detector;
 import org.apache.tika.exception.EncryptedDocumentException;
+import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaMetadataKeys;
 import org.apache.tika.mime.MediaType;
@@ -67,11 +70,7 @@ import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.transform.stream.StreamResult;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Locale;
@@ -453,6 +452,54 @@ public class TikaResource {
     @Path("form")
     public StreamingOutput getTextFromMultipart(Attachment att, @Context final UriInfo info) {
         return produceText(att.getObject(InputStream.class), new Metadata(), att.getHeaders(), info);
+    }
+    @PUT
+    @Consumes("*/*")
+    @Produces("text/plain")
+    @Path("ocrFirstPage")
+    public String ocrFirstPage(final InputStream is, @Context HttpHeaders httpHeaders, @Context final UriInfo info) throws IOException, TikaException, SAXException {
+        // InputStream stream = new FileInputStream("/Users/reshavabraham/work/pdf_data/nlm-data/original-docs/111_Leroy_OM_FINAL.pdf");
+
+        PDDocument pdfDoc = new PDDocument();
+        PDDocument pages = PDDocument.load(is);
+        PDPage page = pages.getPage(0);
+        // Create a new empty document
+        PDDocument document = new PDDocument();
+
+        // Create a new blank page and add it to the document
+        document.addPage(page);
+
+        // Save the newly created document
+        File temp = File.createTempFile("tikafirstpage", ".txt");
+        document.save(temp);
+
+        // finally make sure that the document is properly
+        // closed.
+        document.close();
+
+        Parser parser = new AutoDetectParser();
+        BodyContentHandler handler = new BodyContentHandler(Integer.MAX_VALUE);
+
+        TesseractOCRConfig config = new TesseractOCRConfig();
+        PDFParserConfig pdfConfig = new PDFParserConfig();
+        pdfConfig.setExtractInlineImages(true);
+
+        PDFParserConfig pdfParserConfig = new PDFParserConfig();
+        pdfParserConfig.setOcrStrategy("ocr_only");
+        ParseContext parseContext = new ParseContext();
+        parseContext.set(TesseractOCRConfig.class, config);
+        parseContext.set(PDFParserConfig.class, pdfConfig);
+        parseContext.set(PDFParserConfig.class, pdfParserConfig);
+        //need to add this to make sure recursive parsing happens!
+        parseContext.set(Parser.class, parser);
+
+        FileInputStream stream1 = new FileInputStream(temp);
+        Metadata metadata1 = new Metadata();
+        parser.parse(stream1, handler, metadata1, parseContext);
+        String content = handler.toString();
+        temp.delete();
+
+        return content;
     }
 
     //this is equivalent to text-main in tika-app
