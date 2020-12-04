@@ -463,7 +463,6 @@ public class TikaResource {
     public String ocrFirstPage(final InputStream is, @Context HttpHeaders httpHeaders, @Context final UriInfo info) throws IOException, TikaException, SAXException {
         // InputStream stream = new FileInputStream("/Users/reshavabraham/work/pdf_data/nlm-data/original-docs/111_Leroy_OM_FINAL.pdf");
 
-        PDDocument pdfDoc = new PDDocument();
         PDDocument pages = PDDocument.load(is);
         PDPage page = pages.getPage(0);
         // Create a new empty document
@@ -501,6 +500,7 @@ public class TikaResource {
         parser.parse(stream1, handler, metadata1, parseContext);
         String content = handler.toString();
         temp.delete();
+        pages.close();
 
         return content;
     }
@@ -514,7 +514,6 @@ public class TikaResource {
         Metadata metadata = new Metadata();
         // FileInputStream inputstream = new FileInputStream(new File("/Users/reshavabraham/work/pdf_data/nlm-data/original-docs/111_Leroy_OM_FINAL.pdf"));
 
-        PDDocument pdfDoc = new PDDocument();
         PDDocument pages = PDDocument.load(is);
         PDPage page = pages.getPage(0);
 
@@ -541,13 +540,14 @@ public class TikaResource {
         // PDDocument pdfDoc1 = new PDDocument();
         PDDocument pdfDoc1 = PDDocument.load(temp);
         PDFRenderer pr = new PDFRenderer (pdfDoc1);
-        BufferedImage bi = pr.renderImageWithDPI (0, 300);
-        BufferedImage image = new BufferedImage(300, 300, BufferedImage.TYPE_INT_RGB);
+        BufferedImage bi = pr.renderImageWithDPI (0, 50);
+        BufferedImage image = new BufferedImage(50, 50, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         File temp_1 = File.createTempFile("thumbnail", ".jpg");
         ImageIO.write (bi, "JPEG", temp_1);
 
         document.close();
+        pages.close();
 
         temp_1.deleteOnExit();
         return Response.ok(temp_1).build();
