@@ -228,6 +228,8 @@ class PDF2XHTML extends AbstractPDF2XHTML {
 
             float linePositiony = 0;
             float linePositionx = 0;
+            float endY = 0;
+            float endX = 0;
             String last_char_pos = "[]";
             String height = "8";
             String y_rel = "";
@@ -242,15 +244,19 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             String height1 = "start-font-size:" + Float.toString((float) Math.pow(textPositions.get(0).getHeightDir(), 1)) + "px;";
             String top1 = "top1:" + Float.toString(textPositions.get(0).getYDirAdj()) + "px;";
             String font_size = "";
+            String font_size_pt = "";
             //for (TextPosition s : textPositions) {
+            // each text position is a character??
             for (int i = 0; i < textPositions.size(); i ++) {
                 TextPosition s = textPositions.get(i);
                 font_size = Float.toString((float) Math.pow(s.getHeightDir(), 1));
+                font_size_pt = Float.toString(s.getFontSizeInPt());
                 height = "font-size:" + Float.toString((float) Math.pow(s.getHeightDir(), 1)) + "px;";
                 y_rel = "top:" + Float.toString(s.getYDirAdj()) + "px;";
                 linePositiony = s.getYDirAdj();
                 linePositionx = s.getXDirAdj();
-
+                endY = s.getEndY();
+                endX = s.getEndX();
 
                 PDFontDescriptor fd = s.getFont().getFontDescriptor();
                 font_type = fd.getFontFamily();
@@ -281,14 +287,28 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                 if (i+1 < textPositions.size()) {
                     if (textPositions.get(i+1).toString().equals(" ")) {
                         // if next char is a space save get the position of the last char of the word
-                        wordsEndPos.add("(" + linePositionx + "," + linePositiony + ")");
-                        String font  = "(" + font_type + "," + font_style + "," + font_size + "," + font_weight + ")";
+                        wordsEndPos.add("(" + endX +
+                                "," + endY
+                                + ")");
+                        String font  = "(" + font_type +
+                                "," + font_style +
+                                "," + font_size +
+                                "," + font_weight +
+                                "," + font_size_pt +
+                                ")";
                         wordsFonts.add(font);
                     }
                 } else {
                     // last char
-                    wordsEndPos.add("(" + linePositionx + "," + linePositiony + ")");
-                    String font  = "(" + font_type + "," + font_style + "," + font_size + "," + font_weight + ")";
+                    wordsEndPos.add("(" + endX +
+                            "," + endY +
+                            ")");
+                    String font  = "(" + font_type +
+                            "," + font_style +
+                            "," + font_size +
+                            "," + font_weight +
+                            "," + font_size_pt +
+                            ")";
                     wordsFonts.add(font);
                 }
 
@@ -305,6 +325,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             font_weight = "font-weight:" + font_weight + ";";
             font_style = "font-style:" + font_style + ";";
             font_type = "font-family:" + font_type + ";";
+            font_size_pt = "font-size:" + font_size_pt + ";";
             word_start_pos = "word-start-positions:" + wordsStartPos.toString();
             String word_end_pos = ";word-end-positions:" + wordsEndPos.toString();
             String word_fonts = ";word-fonts:" + wordsFonts.toString();
