@@ -245,12 +245,14 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             String top1 = "top1:" + Float.toString(textPositions.get(0).getYDirAdj()) + "px;";
             String font_size = "";
             String font_size_pt = "";
+            String font_space_width = "";
             //for (TextPosition s : textPositions) {
             // each text position is a character??
             for (int i = 0; i < textPositions.size(); i ++) {
                 TextPosition s = textPositions.get(i);
                 font_size = Float.toString((float) Math.pow(s.getHeightDir(), 1));
                 font_size_pt = Float.toString(s.getFontSizeInPt());
+                font_space_width = Float.toString(s.getFont().getSpaceWidth());
                 height = "font-size:" + Float.toString((float) Math.pow(s.getHeightDir(), 1)) + "px;";
                 y_rel = "top:" + Float.toString(s.getYDirAdj()) + "px;";
                 linePositiony = s.getYDirAdj();
@@ -295,6 +297,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                                 "," + font_size +
                                 "," + font_weight +
                                 "," + font_size_pt +
+                                "," + font_space_width +
                                 ")";
                         wordsFonts.add(font);
                     }
@@ -308,6 +311,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                             "," + font_size +
                             "," + font_weight +
                             "," + font_size_pt +
+                            "," + font_space_width +
                             ")";
                     wordsFonts.add(font);
                 }
@@ -325,12 +329,12 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             font_weight = "font-weight:" + font_weight + ";";
             font_style = "font-style:" + font_style + ";";
             font_type = "font-family:" + font_type + ";";
-            font_size_pt = "font-size:" + font_size_pt + ";";
+            font_size_pt = "font-size-pt:" + font_size_pt + "pt;";
             word_start_pos = "word-start-positions:" + wordsStartPos.toString();
             String word_end_pos = ";word-end-positions:" + wordsEndPos.toString();
             String word_fonts = ";word-fonts:" + wordsFonts.toString();
 
-            String val = top1 + height1 + height + font_type + font_style + font_weight + y_rel + "position:absolute;" +
+            String val = top1 + height1 + height + font_size_pt + font_type + font_style + font_weight + y_rel + "position:absolute;" +
                     indent + word_start_pos + ";last-char:" + last_char_pos + word_end_pos + word_fonts;
             //String val = height + y_rel  + indent;
             xhtml.startElement("p", "style", val);
