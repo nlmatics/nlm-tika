@@ -19,6 +19,7 @@ package org.apache.tika.parser.pdf;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -213,16 +214,31 @@ class PDF2XHTML extends AbstractPDF2XHTML {
     //     }
     // }
 
- 
+//    TextPosition textPosition = textPositions.get(0);
+//    PDFont font = textPosition.getFont();
+//    PDFontDescriptor fontDescriptor = font.getFontDescriptor();
+//    // this is font size in points?
+//    float fontSize = textPosition.getFontSize();
+//    float xScale = font.getFontMatrix().getScaleX();
+//    float yScale = font.getFontMatrix().getScaleY();
+//    float spaceWidth = font.getSpaceWidth()*xScale*fontSize;
+//    float fontSizePx = fontDescriptor.getCapHeight()*yScale*fontSize;
+//    float fontHeight = font.getBoundingBox().getHeight()*yScale*fontSize;
+
 
     @Override
     protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
         try {
             StringBuilder testWordStartPos = new StringBuilder();
+
             ArrayList<String> wordsStartPos = new ArrayList<>(20);
             ArrayList<String> wordsEndPos = new ArrayList<>(20);
-            ArrayList<String> wordsFonts = new ArrayList<>(20);
+            ArrayList<List<String>> wordsFonts = new ArrayList<>(20);
             ArrayList<String> wordSpaceDistanceList = new ArrayList<>(20);
+            ArrayList<Float> wordGaps = new ArrayList<>(20);
+            ArrayList<Float> fontSpaceWidths = new ArrayList<>(20);
+            ArrayList<List<Integer>> splitPoints = new ArrayList<>(20);
+            ArrayList<Float> indents = new ArrayList<>(20);
             // int wordCount = text.split("\\s+").length;
             // String[] wordsStartPos2 = new String[wordCount];
 
@@ -230,39 +246,48 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             float linePositionx = 0;
             float endY = 0;
             float endX = 0;
+            float fontXScale = 0;
+            float fontYScale = 0;
             String last_char_pos = "[]";
-            String height = "8";
+            String height = "";
             String y_rel = "";
             String font_type = "";
             String font_weight = "normal";
             String font_style = "normal";
             String word_start_pos = "";
             //xhtml.startElement("div", "style", "border:3px solid ##ff0000;");
-            String s1 = Float.toString(textPositions.get(0).getXDirAdj() * 1);
-            String indent = "text-indent:" + s1 + "px;";
+//        String s1 = Float.toString(textPositions.get(0).getXDirAdj() * 1);
+//        String indent = "text-indent:" + s1 + "px;";
+            splitPoints.add(Arrays.asList(0, 0));
+            indents.add(textPositions.get(0).getXDirAdj());
             String prev = " ";
-            String height1 = "start-font-size:" + Float.toString((float) Math.pow(textPositions.get(0).getHeightDir(), 1)) + "px;";
-            String top1 = "top1:" + Float.toString(textPositions.get(0).getYDirAdj()) + "px;";
+//            String height1 = "start-font-size:" + Float.toString((float) Math.pow(textPositions.get(0).getHeightDir(), 1)) + "px;";
+//            String top1 = "top1:" + Float.toString(textPositions.get(0).getYDirAdj()) + "px;";
             String font_size = "";
             String font_size_pt = "";
             String font_size_px = "";
             String font_space_width = "";
+
+            float prevWordEndX = 0;
             //for (TextPosition s : textPositions) {
             // each text position is a character??
-            for (int i = 0; i < textPositions.size(); i ++) {
+            for (int i = 0; i < textPositions.size(); i++) {
+
                 TextPosition s = textPositions.get(i);
-                font_size = Float.toString((float) Math.pow(s.getHeightDir(), 1));
-//                font_size = Float.toString(s.getFontSizeInPt());
+                PDFontDescriptor fd = s.getFont().getFontDescriptor();
+                fontXScale = s.getFont().getFontMatrix().getScaleX();
+                fontYScale = s.getFont().getFontMatrix().getScaleY();
+                height = Float.toString((float) Math.pow(s.getHeightDir(), 1));
                 font_size_pt = Float.toString(s.getFontSizeInPt());
-                font_space_width = Float.toString(s.getFont().getSpaceWidth());
-                height = "font-size:" + Float.toString((float) Math.pow(s.getHeightDir(), 1)) + "px;";
+//                font_size = Float.toString(fd.getCapHeight()*fontYScale*s.getFontSizeInPt());
+                font_size = Float.toString(s.getYScale());
+                font_space_width = Float.toString(s.getWidthOfSpace());
                 y_rel = "top:" + Float.toString(s.getYDirAdj()) + "px;";
                 linePositiony = s.getYDirAdj();
                 linePositionx = s.getXDirAdj();
                 endY = s.getEndY();
                 endX = s.getEndX();
 
-                PDFontDescriptor fd = s.getFont().getFontDescriptor();
                 font_type = fd.getFontFamily();
                 if (font_type == null) {
                     font_type = fd.getFontName();
@@ -288,34 +313,19 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                     font_style = "italic";
                 }
 
-                if (i+1 < textPositions.size()) {
-                    if (textPositions.get(i+1).toString().equals(" ")) {
+                if (i + 1 < textPositions.size()) {
+                    if (textPositions.get(i + 1).toString().equals(" ")) {
                         // if next char is a space save get the position of the last char of the word
                         wordsEndPos.add("(" + endX +
                                 "," + endY
                                 + ")");
-                        String font  = "(" + font_type +
-                                "," + font_style +
-                                "," + font_size +
-                                "," + font_weight +
-                                "," + font_size_pt +
-                                "," + font_space_width +
-                                ")";
-                        wordsFonts.add(font);
+                        prevWordEndX = endX;
                     }
                 } else {
                     // last char
                     wordsEndPos.add("(" + endX +
                             "," + endY +
                             ")");
-                    String font  = "(" + font_type +
-                            "," + font_style +
-                            "," + font_size +
-                            "," + font_weight +
-                            "," + font_size_pt +
-                            "," + font_space_width +
-                            ")";
-                    wordsFonts.add(font);
                 }
 
                 // get start of word in format (xCoord, yCoord)
@@ -324,30 +334,105 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                     String tempWordPos = "(" + linePositionx + "," + linePositiony + ")";
                     testWordStartPos.append("(").append(linePositionx).append(",").append(linePositiony).append(")").append("current char: ").append(s.toString());
                     wordsStartPos.add(tempWordPos.toString());
+                    wordsFonts.add(Arrays.asList(font_type, font_weight, font_style, font_size, font_size_pt, font_space_width));
+                    if (wordsFonts.size() > 1) {
+                        float gap = linePositionx - prevWordEndX;
+                        float fontSpaceWidth = s.getWidthOfSpace();//s.getFont().getSpaceWidth()*fontXScale*s.getFontSizeInPt();
+                        wordGaps.add(gap);
+                        fontSpaceWidths.add(fontSpaceWidth);
+                        if (gap > 2*fontSpaceWidth) {
+                            splitPoints.add(Arrays.asList(i, wordsFonts.size() - 1));
+                            indents.add(s.getXDirAdj());
+                        }
+                    }
                 }
                 prev = s.toString();
                 last_char_pos = "(" + Float.toString(linePositionx) + ", " + Float.toString(linePositiony) + ")";
             }
-            font_weight = "font-weight:" + font_weight + ";";
-            font_style = "font-style:" + font_style + ";";
-            font_type = "font-family:" + font_type + ";";
-            font_size_px = "font-size:" + font_size + "px;";
-            font_size_pt = "font-size-pt:" + font_size_pt + "pt;";
-            word_start_pos = "word-start-positions:" + wordsStartPos.toString();
-            String word_end_pos = ";word-end-positions:" + wordsEndPos.toString();
-            String word_fonts = ";word-fonts:" + wordsFonts.toString();
+            //text = This is a test
+            height = "height:" + height + "px;";
+//        if (splitPoints.size() > 1) {
+//            System.out.println("**********" + text);
+//        }
 
-            String val = top1 + height1 + font_size_px + font_size_pt + font_type + font_style + font_weight + y_rel + "position:absolute;" +
-                    indent + word_start_pos + ";last-char:" + last_char_pos + word_end_pos + word_fonts;
+            for (int j = 0; j < splitPoints.size(); j++) {
+                int splitWordStart = splitPoints.get(j).get(1);
+                int splitCharStart = splitPoints.get(j).get(0);
+                int splitWordEnd = 0;
+                int splitCharEnd = 0;
+                int endOfEnd = 0; //wow!!!!!!!
+                if (j == splitPoints.size() - 1) {
+                    splitWordEnd = splitPoints.size();
+                    splitCharEnd = textPositions.size();
+                    endOfEnd = wordsEndPos.size();
+                } else {
+                    splitWordEnd = splitPoints.get(j + 1).get(1);
+                    splitCharEnd = splitPoints.get(j + 1).get(0);
+                    endOfEnd = splitWordEnd;
+                }
+//            System.out.println(splitWordStart + ", " + splitWordEnd + ", " + splitCharStart + ", " + splitCharEnd);
+//            System.out.println(text + "->" + text.length() + "->" + splitPoints.size() + splitStart + ", " + splitEnd);
+                String indent = "text-indent:" + indents.get(j) + "px;";
+                word_start_pos = "word-start-positions:" + wordsStartPos.subList(splitWordStart, splitWordEnd).toString();
+                String word_end_pos = ";word-end-positions:" + wordsEndPos.subList(splitWordStart, endOfEnd).toString();
+                List<List<String>> word_fonts = wordsFonts.subList(splitWordStart, splitWordEnd);
+                List<String> firstWordFont = word_fonts.get(0);
+                List<String> allWordFonts = new ArrayList<>();
+                for (int k = 0; k < word_fonts.size(); k++) {
+                    String fontStr = "(" + String.join(",", word_fonts.get(k)) + ")";
+                    allWordFonts.add(fontStr);
+                }
+//                wordsFonts.add(Arrays.asList(font_type, font_weight, font_style, font_size, font_size_pt, font_space_width));
+                font_type = "font-family:" + firstWordFont.get(0) + ";";
+                font_weight = "font-weight:" + firstWordFont.get(1) + ";";
+                font_style = "font-style:" + firstWordFont.get(2) + ";";
+                font_size_px = "font-size:" + firstWordFont.get(3) + "px;";
+//                font_size_pt = "font-size:" + firstWordFont.get(3) + "px;";
+                String spanText = text.substring(splitCharStart, splitCharEnd);
+                String val =
+                        height +
+                                font_size_px +
+//                            font_size_pt +
+                                font_type +
+                                font_style +
+                                font_weight +
+                                y_rel + "position:absolute;" +
+                                indent +
+                                word_start_pos +
+                                ";last-char:" + last_char_pos +
+                                word_end_pos +
+                                ";word-fonts:" + allWordFonts;
+
+                xhtml.startElement("p", "style", val);
+                xhtml.characters(spanText);
+                xhtml.endElement("p");
+                //            if (splitPoints.size() > 1) {
+//                System.out.println(">>>> " + spanText);
+//                System.out.println(word_start_pos);
+//                System.out.println(word_end_pos);
+//                System.out.println(word_fonts);
+//                System.out.println("gaps:" + wordGaps);
+//                System.out.println("spaceWidths:" + fontSpaceWidths);
+//                System.out.println("\n");
+//            }
+            }
+//        System.out.println(val);
             //String val = height + y_rel  + indent;
-            xhtml.startElement("p", "style", val);
-            xhtml.characters(text);
-            xhtml.endElement("p");
             //xhtml.endElement("div");
         } catch (SAXException e) {
             throw new IOException(
                     "Unable to write a string: " + text, e);
         }
+    }
+
+    private String getWordFontString(String font_type, String font_weight, String font_style, String font_size, String font_size_pt, String font_space_width) {
+        return "(" + font_type +
+                "," + font_style +
+                "," + font_size +
+                "," + font_weight +
+                "," + font_size_pt +
+                "," + font_space_width +
+                ")";
     }
 
     @Override
