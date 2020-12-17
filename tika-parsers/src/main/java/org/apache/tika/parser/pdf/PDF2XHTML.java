@@ -212,12 +212,6 @@ class PDF2XHTML extends AbstractPDF2XHTML {
         ArrayList<Float> indents = new ArrayList<>(20);
 
         TextPosition prevTextPosition = null;
-        float endX = 0;
-        float endY = 0;
-        float top = textPositions.get(0).getYDirAdj();
-        float height = textPositions.get(0).getHeightDir();
-        splitPoints.add(0);
-        indents.add(textPositions.get(0).getXDirAdj());
         //get rid of consecutive spaces
         List<TextPosition> goodPositions = new ArrayList<>();
         //skip leading training and consecutive spaces
@@ -238,6 +232,15 @@ class PDF2XHTML extends AbstractPDF2XHTML {
         if (goodPositions.size() == 0) {
             return new ArrayList<>();
         }
+        float endX = 0;
+        float endY = 0;
+        float top = goodPositions.get(0).getYDirAdj();
+        float height = goodPositions.get(0).getHeightDir();
+        splitPoints.add(0);
+        indents.add(goodPositions.get(0).getXDirAdj());
+        String fontWeight = "normal";
+        String fontStyle = "normal";
+
         prevTextPosition = null;
         for (int i = 0; i < goodPositions.size(); i++) {
             TextPosition s = goodPositions.get(i);
@@ -251,8 +254,6 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             endX = s.getEndX();
             endY = s.getEndY();
             String fontType = fd.getFontFamily();
-            String fontWeight = "bold";
-            String fontStyle = "normal";
 
             if (fontType == null) {
                 fontType = fd.getFontName();
@@ -263,8 +264,17 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                     String[] arr = fontType.split(",");
                     if (arr[1].toLowerCase(Locale.ENGLISH).contains("bold")) {
                         fontWeight = "bold";
+                    } else if (arr[1].toLowerCase(Locale.ENGLISH).contains("italic")) {
+                        fontStyle = "italic";
                     }
                     fontType = arr[0];
+                }
+            }
+            if (fontType != null) {
+                if (fontType.toLowerCase().contains("bold")) {
+                    fontWeight = "600";
+                } else if (fontType.toLowerCase().contains("italic")) {
+                    fontStyle = "italic";
                 }
             }
 
@@ -287,10 +297,10 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                     wordStartPos.add(Arrays.asList(startX, startY));
                     wordFonts.add(Arrays.asList(fontType, fontWeight, fontStyle,
                             Float.toString(fontSize), Float.toString(fontSizeInPt), Float.toString(fontSpaceWidth)));
-                    if (words.size() > 1) {
-                        float gap = startX - wordEndPos.get(wordEndPos.size() - 1).get(0);
-                        if (gap > 2*fontSpaceWidth) {
-                            splitPoints.add(words.size() - 1);
+                    if (words.size() > 0) {
+                        float gap = startX - prevTextPosition.getEndX();
+                        if (gap > 1.0) {
+                            splitPoints.add(words.size());
                             indents.add(s.getXDirAdj());
                         }
                     }
@@ -352,11 +362,15 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                             "word-start-positions:" + startStr +
                             ";word-end-positions:" + endStr +
                             ";word-fonts:" + fontsStr;
-
             result.add(Arrays.asList(spanText, val));
         }
         return result;
     }
+
+//    @Override
+//    public boolean getSortByPosition() {
+//        return true;
+//    }
 
     @Override
     protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
