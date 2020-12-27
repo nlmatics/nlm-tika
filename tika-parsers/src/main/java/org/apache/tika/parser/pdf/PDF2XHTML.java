@@ -202,6 +202,16 @@ class PDF2XHTML extends AbstractPDF2XHTML {
         //System.out.println("paragraph end");
     }
 
+    private static String sanitizeText(TextPosition textPosition) {
+        String currChar = textPosition.getUnicode();
+        currChar = currChar.replaceAll("\u00a0", " ");
+//        currChar = currChar.replaceAll("\u201c", "\"");
+//        currChar = currChar.replaceAll("\u201d", "\"");
+//        currChar = currChar.replaceAll("\u2018", "'");
+//        currChar = currChar.replaceAll("\u2019", "'");
+        return currChar;
+    }
+
     private List<List<String>> writeStringInner(String text, List<TextPosition> textPositions) throws IOException {
         ArrayList<String> words = new ArrayList<>();
         StringBuffer wordBuf = new StringBuffer();
@@ -217,8 +227,9 @@ class PDF2XHTML extends AbstractPDF2XHTML {
         //skip leading training and consecutive spaces
         for (int i = 0; i < textPositions.size(); i++) {
             TextPosition s = textPositions.get(i);
-            boolean isSpace = s.getUnicode().equals(" ");
-            boolean prevCharIsSpace = prevTextPosition != null && prevTextPosition.getUnicode().equals(" ");
+            String currChar = sanitizeText(s);
+            boolean isSpace = currChar.equals(" ");
+            boolean prevCharIsSpace = prevTextPosition != null && sanitizeText(prevTextPosition).equals(" ");
             boolean firstLastSpace = isSpace && i == 0 || i == textPositions.size() - 1;
             boolean skip = isSpace && (prevCharIsSpace || firstLastSpace);
             if (!skip) {
@@ -226,7 +237,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             }
             prevTextPosition = s;
         }
-        if (goodPositions.size() > 0 && goodPositions.get(goodPositions.size() - 1).getUnicode().equals(" ")){
+        if (goodPositions.size() > 0 && sanitizeText(goodPositions.get(goodPositions.size() - 1)).equals(" ")){
             goodPositions.remove(goodPositions.size() - 1);
         }
         if (goodPositions.size() == 0) {
@@ -254,7 +265,6 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             endX = s.getEndX();
             endY = s.getEndY();
             String fontType = fd.getFontFamily();
-
             if (fontType == null) {
                 fontType = fd.getFontName();
                 if (fontType.contains("+")) {
@@ -286,20 +296,25 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                 fontStyle = "italic";
             }
 
-            String currChar = s.getUnicode();
-            if (currChar.equals(" ")) {
+            String currChar = sanitizeText(s);
+//            System.out.println(currChar + "->" + fd.getFontFamily() + "," + fd.getFontName() + "," + fd.getFontWeight());
+            if (currChar.equals(" ")) {//end of word
                 words.add(wordBuf.toString());
+//                System.out.println(wordBuf.toString() + "->" + fontType + "," + fontStyle + "," + fontWeight);
                 //" " considered as part of word
                 wordEndPos.add(Arrays.asList(endX, endY));
                 wordBuf = new StringBuffer();
             } else {
-                if (wordBuf.length() == 0) {//first charactor of word
+                if (wordBuf.length() == 0) {//first character of word
+//                    System.out.println(currChar + "->" + fd.getFontFamily() + "," + fd.getFontName() + "," + fd.getFontWeight());
+//                    System.out.println(currChar + "->" + fontType + "," + fontStyle + "," + fontWeight);
                     wordStartPos.add(Arrays.asList(startX, startY));
                     wordFonts.add(Arrays.asList(fontType, fontWeight, fontStyle,
                             Float.toString(fontSize), Float.toString(fontSizeInPt), Float.toString(fontSpaceWidth)));
                     if (words.size() > 0) {
                         float gap = startX - prevTextPosition.getEndX();
-                        if (gap > 1.0) {
+                        //todo use split points for mixed font separation when possible?
+                        if (gap > 1.0) {//when tika loses the gap between two words, this restores it e.g. 1234.20 $
                             splitPoints.add(words.size());
                             indents.add(s.getXDirAdj());
                         }
@@ -307,12 +322,13 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                 }
                 wordBuf.append(currChar);
             }
+            fontWeight = "normal";
+            fontStyle = "normal";
             prevTextPosition = s;
         }
         //write last word
         words.add(wordBuf.toString());
         wordEndPos.add(Arrays.asList(endX, endY));
-
         if (wordStartPos.size() != wordEndPos.size()) {
             System.out.println("!!!!!!!Error");
             System.out.println(wordFonts.size() + ", " + wordStartPos.size() + ", " + wordEndPos.size());
