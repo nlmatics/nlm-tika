@@ -247,14 +247,16 @@ class PDF2XHTML extends AbstractPDF2XHTML {
         float endY = 0;
         float top = goodPositions.get(0).getYDirAdj();
         float height = goodPositions.get(0).getHeightDir();
+
         splitPoints.add(0);
         indents.add(goodPositions.get(0).getXDirAdj());
         String fontWeight = "normal";
         String fontStyle = "normal";
-
         prevTextPosition = null;
+
         for (int i = 0; i < goodPositions.size(); i++) {
             TextPosition s = goodPositions.get(i);
+//            System.out.println(s.getYScale());
             PDFontDescriptor fd = s.getFont().getFontDescriptor();
 
             float fontSizeInPt = s.getFontSizeInPt();
@@ -263,8 +265,9 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             float startX = s.getXDirAdj();
             float startY = s.getYDirAdj();
             endX = s.getEndX();
-            endY = s.getEndY();
+            endY = startY;
             String fontType = fd.getFontFamily();
+//            System.out.println(s.toString() + "->startX: " + startX + ", endX: " + endX + ", startY: " + startY + ", endY: " + endY);
             if (fontType == null) {
                 fontType = fd.getFontName();
                 if (fontType.contains("+")) {
@@ -297,17 +300,16 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             }
 
             String currChar = sanitizeText(s);
-//            System.out.println(currChar + "->" + fd.getFontFamily() + "," + fd.getFontName() + "," + fd.getFontWeight());
+//            System.out.println(">" + currChar + "->" + currChar.equals(" "));
             if (currChar.equals(" ")) {//end of word
                 words.add(wordBuf.toString());
 //                System.out.println(wordBuf.toString() + "->" + fontType + "," + fontStyle + "," + fontWeight);
                 //" " considered as part of word
-                wordEndPos.add(Arrays.asList(endX, endY));
+                //let's omit the space endX
+                wordEndPos.add(Arrays.asList(prevTextPosition.getEndX(), endY));
                 wordBuf = new StringBuffer();
             } else {
                 if (wordBuf.length() == 0) {//first character of word
-//                    System.out.println(currChar + "->" + fd.getFontFamily() + "," + fd.getFontName() + "," + fd.getFontWeight());
-//                    System.out.println(currChar + "->" + fontType + "," + fontStyle + "," + fontWeight);
                     wordStartPos.add(Arrays.asList(startX, startY));
                     wordFonts.add(Arrays.asList(fontType, fontWeight, fontStyle,
                             Float.toString(fontSize), Float.toString(fontSizeInPt), Float.toString(fontSpaceWidth)));
@@ -336,7 +338,10 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             System.out.println(words);
         }
         List<List<String>> result = new ArrayList<>();
-        for (int j = 0; j < splitPoints.size(); j++) {
+//        System.out.println("Number of split points: " + splitPoints.size());
+//        System.out.println("Start positions: " + wordStartPos);
+//        System.out.println("End positions: " + wordEndPos);
+        for (int j = 0; j < splitPoints.size(); j++) {//split points are to handle spaces which are tabs
             int splitStart = splitPoints.get(j);
             int splitEnd = 0;
             if (j == splitPoints.size() - 1) {
@@ -360,6 +365,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                         splitEndPos.get(k).get(0) + "," +
                         splitEndPos.get(k).get(1) + ")");
                 fontsStr.add("(" + String.join(",", splitFonts.get(k)) + ")");
+//                System.out.println(String.join(",", splitFonts.get(k)));
             }
             String fontTypeStr = "font-family:" + firstWordFont.get(0) + ";";
             String fontWeightStr = "font-weight:" + firstWordFont.get(1) + ";";
@@ -382,6 +388,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
         }
         return result;
     }
+
 
 //    @Override
 //    public boolean getSortByPosition() {
