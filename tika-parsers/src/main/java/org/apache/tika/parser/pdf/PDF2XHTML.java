@@ -204,11 +204,33 @@ class PDF2XHTML extends AbstractPDF2XHTML {
 
     private static String sanitizeText(TextPosition textPosition) {
         String currChar = textPosition.getUnicode();
-        currChar = currChar.replaceAll("\u00a0", " ");
-//        currChar = currChar.replaceAll("\u201c", "\"");
-//        currChar = currChar.replaceAll("\u201d", "\"");
-//        currChar = currChar.replaceAll("\u2018", "'");
-//        currChar = currChar.replaceAll("\u2019", "'");
+        //characters taken from
+        //https://www.fileformat.info/info/unicode/category/Zs/list.htm
+        String[] spaceChars = new String[]{
+                "\u00a0",
+                "\t",
+                "\u200b",
+                "\u0020",
+                "\u1680",
+                "\u2000",
+                "\u2001",
+                "\u2002",
+                "\u2003",
+                "\u2004",
+                "\u2005",
+                "\u2006",
+                "\u2007",
+                "\u2008",
+                "\u2009",
+                "\u200a",
+                "\u202f",
+                "\u205f",
+                "\u3000",
+        };
+        for (int i = 0; i < spaceChars.length; i++) {
+            String spaceChar = spaceChars[i];
+            currChar = currChar.replaceAll(spaceChar, " ");
+        }
         return currChar;
     }
 
@@ -227,14 +249,40 @@ class PDF2XHTML extends AbstractPDF2XHTML {
         //skip leading training and consecutive spaces
         for (int i = 0; i < textPositions.size(); i++) {
             TextPosition s = textPositions.get(i);
+//            System.out.println(">>>>" + s.getUnicode());
             String currChar = sanitizeText(s);
+
+
             boolean isSpace = currChar.equals(" ");
             boolean prevCharIsSpace = prevTextPosition != null && sanitizeText(prevTextPosition).equals(" ");
             boolean firstLastSpace = isSpace && i == 0 || i == textPositions.size() - 1;
-            boolean skip = isSpace && (prevCharIsSpace || firstLastSpace);
+
+
+//        public Matrix(AffineTransform at)
+//            {
+//                single = new float[SIZE];
+//                single[0] = (float)at.getScaleX();
+//                single[1] = (float)at.getShearY();
+//                single[3] = (float)at.getShearX();
+//                single[4] = (float)at.getScaleY();
+//                single[6] = (float)at.getTranslateX();
+//                single[7] = (float)at.getTranslateY();
+//                single[8] = 1;
+//            }
+//            return new Matrix(cosTheta, sinTheta, -sinTheta, cosTheta, tx, ty);
+            Matrix tm = s.getTextMatrix();
+//            double angle = Math.acos(tm.getScaleX());
+//            System.out.println("tm= " + tm);
+            boolean isRotated = tm.getScaleX() == tm.getScaleY()
+                    && tm.getShearX() != 0.0
+                    && tm.getShearY() == -1*tm.getShearX();
+            //&& angle != 0.0 && angle != 270.0;
+            boolean skip = (isSpace && (prevCharIsSpace || firstLastSpace))
+                    || (s.getDir() != 0.0 && s.getDir() != 270.0) || isRotated;
             if (!skip) {
                 goodPositions.add(s);
             }
+//            System.out.println(">>>>>>>>>" + s.toString() + "--->" + s.getDir() +  skip + tm.getScaleX());
             prevTextPosition = s;
         }
         if (goodPositions.size() > 0 && sanitizeText(goodPositions.get(goodPositions.size() - 1)).equals(" ")){
@@ -264,7 +312,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             float fontSpaceWidth = s.getWidthOfSpace();
             float startX = s.getXDirAdj();
             float startY = s.getYDirAdj();
-            endX = s.getEndX();
+            endX = startX + s.getWidthDirAdj();
             endY = startY;
             String fontType = fd.getFontFamily();
 //            System.out.println(s.toString() + "->startX: " + startX + ", endX: " + endX + ", startY: " + startY + ", endY: " + endY);
@@ -306,7 +354,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
 //                System.out.println(wordBuf.toString() + "->" + fontType + "," + fontStyle + "," + fontWeight);
                 //" " considered as part of word
                 //let's omit the space endX
-                wordEndPos.add(Arrays.asList(prevTextPosition.getEndX(), endY));
+                wordEndPos.add(Arrays.asList(prevTextPosition.getXDirAdj() + prevTextPosition.getWidthDirAdj(), endY));
                 wordBuf = new StringBuffer();
             } else {
                 if (wordBuf.length() == 0) {//first character of word
@@ -314,7 +362,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                     wordFonts.add(Arrays.asList(fontType, fontWeight, fontStyle,
                             Float.toString(fontSize), Float.toString(fontSizeInPt), Float.toString(fontSpaceWidth)));
                     if (words.size() > 0) {
-                        float gap = startX - prevTextPosition.getEndX();
+                        float gap = startX - prevTextPosition.getXDirAdj() + prevTextPosition.getWidthDirAdj();
                         //todo use split points for mixed font separation when possible?
                         if (gap > 1.0) {//when tika loses the gap between two words, this restores it e.g. 1234.20 $
                             splitPoints.add(words.size());
