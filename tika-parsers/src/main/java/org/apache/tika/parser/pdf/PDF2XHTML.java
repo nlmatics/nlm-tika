@@ -362,8 +362,8 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                     wordFonts.add(Arrays.asList(fontType, fontWeight, fontStyle,
                             Float.toString(fontSize), Float.toString(fontSizeInPt), Float.toString(fontSpaceWidth)));
                     if (words.size() > 0) {
-                        // float gap = startX - prevTextPosition.getXDirAdj() + prevTextPosition.getWidthDirAdj();
-                        float gap = startX - prevTextPosition.getEndX();
+                        float gap = startX - (prevTextPosition.getXDirAdj() + prevTextPosition.getWidthDirAdj());
+//                        float gap = startX - prevTextPosition.getEndX();
                         //todo use split points for mixed font separation when possible?
                         if (gap > 1.0) {//when tika loses the gap between two words, this restores it e.g. 1234.20 $
                             splitPoints.add(words.size());
@@ -402,7 +402,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             List<List<Float>> splitStartPos = wordStartPos.subList(splitStart, splitEnd);
             List<List<Float>> splitEndPos = wordEndPos.subList(splitStart, splitEnd);
             List<List<String>> splitFonts = wordFonts.subList(splitStart, splitEnd);
-            List<String> firstWordFont = wordFonts.get(0);
+            List<String> firstWordFont = splitFonts.get(0);
             List<String> fontsStr = new ArrayList<>();
             List<String> startStr = new ArrayList<>();
             List<String> endStr = new ArrayList<>();
