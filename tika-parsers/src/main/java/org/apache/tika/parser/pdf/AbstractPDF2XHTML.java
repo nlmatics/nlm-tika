@@ -200,7 +200,7 @@ class AbstractPDF2XHTML extends PDFTextStripper {
             attrs.addAttribute("", "class", "class", "CDATA", "page");
             PDRectangle bBox = page.getBBox();
             String pageDims = "height:" + bBox.getHeight() + "px; width:" + bBox.getWidth() + "px;";
-            attrs.addAttribute("", "style", "style", "CDATA", pageDims + " position: relative;border: 3px solid #7FFFD4;padding: 10em;");
+            attrs.addAttribute("", "style", "style", "CDATA", pageDims + " position: relative;border: 1px solid #7FFFD4;");
             xhtml.startElement("div", attrs);
         } catch (SAXException e) {
             throw new IOExceptionWithCause("Unable to start a page", e);

@@ -155,6 +155,7 @@ public class TikaResource {
         TesseractOCRConfig ocrConfig = null;
         PDFParserConfig pdfParserConfig = null;
         for (String key : httpHeaders.keySet()) {
+            System.out.println("http headers key is..." + key);
             if (StringUtils.startsWith(key, X_TIKA_OCR_HEADER_PREFIX)) {
                 ocrConfig = (ocrConfig == null) ? new TesseractOCRConfig() : ocrConfig;
                 processHeaderConfig(httpHeaders, ocrConfig, key, X_TIKA_OCR_HEADER_PREFIX);
@@ -163,6 +164,7 @@ public class TikaResource {
                 processHeaderConfig(httpHeaders, pdfParserConfig, key, X_TIKA_PDF_HEADER_PREFIX);
             }
         }
+        System.out.println("pdf parser config is..." + pdfParserConfig.getExtractInlineImages());
         if (ocrConfig != null) {
             parseContext.set(TesseractOCRConfig.class, ocrConfig);
         }
@@ -237,6 +239,7 @@ public class TikaResource {
 
             if (m != null) {
                 String val = httpHeaders.getFirst(key);
+                System.out.println("-------headers.." + key + "----" + val);
                 val = val.trim();
                 if (clazz == String.class) {
                     checkTrustWorthy(setter, val);

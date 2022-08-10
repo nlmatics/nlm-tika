@@ -43,6 +43,8 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.ParseContext;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
+import org.xml.sax.helpers.AttributesImpl;
+
 
 /**
  * Utility class that overrides the {@link PDFTextStripper} functionality
@@ -151,13 +153,18 @@ class PDF2XHTML extends AbstractPDF2XHTML {
     }
 
     void extractImages(PDPage page) throws SAXException, IOException {
+        System.out.println("----will extract images: " + config.getExtractInlineImages());
         if (config.getExtractInlineImages() == false) {
             return;
         }
-
+        AttributesImpl svgAttrs = new AttributesImpl();
+        svgAttrs.addAttribute("", "width", "width", "CDATA", String.valueOf(page.getBBox().getWidth()));
+        svgAttrs.addAttribute("", "height", "height", "CDATA", String.valueOf(page.getBBox().getHeight()));
+        xhtml.startElement("svg", svgAttrs);
         ImageGraphicsEngine engine = new ImageGraphicsEngine(page, embeddedDocumentExtractor,
                 config, processedInlineImages, inlineImageCounter, xhtml, metadata, context);
         engine.run();
+        xhtml.endElement("svg");
         List<IOException> engineExceptions = engine.getExceptions();
         if (engineExceptions.size() > 0) {
             IOException first = engineExceptions.remove(0);
@@ -332,9 +339,9 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                 }
             }
             if (fontType != null) {
-                if (fontType.toLowerCase().contains("bold")) {
+                if (fontType.toLowerCase(Locale.ENGLISH).contains("bold")) {
                     fontWeight = "600";
-                } else if (fontType.toLowerCase().contains("italic")) {
+                } else if (fontType.toLowerCase(Locale.ENGLISH).contains("italic")) {
                     fontStyle = "italic";
                 }
             }

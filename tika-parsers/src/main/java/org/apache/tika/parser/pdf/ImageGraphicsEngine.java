@@ -31,6 +31,7 @@ import org.apache.pdfbox.pdmodel.graphics.color.PDPattern;
 import org.apache.pdfbox.pdmodel.graphics.form.PDTransparencyGroup;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImage;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.pattern.PDAbstractPattern;
 import org.apache.pdfbox.pdmodel.graphics.pattern.PDTilingPattern;
 import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
@@ -64,7 +65,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import java.util.concurrent.atomic.AtomicInteger;
+
 
 /**
  * Copied nearly verbatim from PDFBox
@@ -97,6 +101,7 @@ class ImageGraphicsEngine extends PDFGraphicsStreamEngine {
     private final Metadata parentMetadata;
     private final XHTMLContentHandler xhtml;
     private final ParseContext parseContext;
+    private Point2D currentPoint = new Point2D.Float(0, 0);
 
     //TODO: this is an embarrassment of an initializer...fix
     protected ImageGraphicsEngine(PDPage page, EmbeddedDocumentExtractor embeddedDocumentExtractor,
@@ -146,6 +151,17 @@ class ImageGraphicsEngine extends PDFGraphicsStreamEngine {
             }
         }
     }
+    private String getStrokeStyle() {
+        float[] components = getGraphicsState().getStrokingColor().getComponents();
+        PDRectangle pageDim = this.getPage().getBBox();
+        float[] rgb = {0, 0, 0};
+        for (int i=0; i < components.length; i++) {
+            rgb[i] = components[i]*255;
+        }
+        String color = "rgb(" + StringUtils.join(ArrayUtils.toObject(rgb), ",") + ")";
+        String styleStr = "fill:none;" + "stroke-width:" + this.getGraphicsState().getLineWidth() + ";stroke:" + color;
+        return styleStr;
+    }
 
     @Override
     public void drawImage(PDImage pdImage) throws IOException {
@@ -183,7 +199,25 @@ class ImageGraphicsEngine extends PDFGraphicsStreamEngine {
     @Override
     public void appendRectangle(Point2D p0, Point2D p1, Point2D p2, Point2D p3)
             throws IOException {
-
+        String styleStr = this.getStrokeStyle();
+        PDRectangle pageDim = this.getPage().getBBox();
+        double x = p3.getX();
+        double y = pageDim.getUpperRightY() - p3.getY();
+        double width = p1.getX() - p0.getX();
+        double height = p1.getY() - p3.getY();
+        AttributesImpl attrs = new AttributesImpl();
+        attrs.addAttribute("", "x", "x", "CDATA", String.valueOf(x));
+        attrs.addAttribute("", "y", "y", "CDATA", String.valueOf(y));
+        attrs.addAttribute("", "width", "width", "CDATA", String.valueOf(width));
+        attrs.addAttribute("", "height", "height", "CDATA", String.valueOf(height));
+        attrs.addAttribute("", "style", "style", "CDATA", styleStr);
+        try {
+            xhtml.startElement("rect", attrs);
+            xhtml.characters("");
+            xhtml.endElement("rect");
+        } catch (SAXException e) {
+            throw new IOExceptionWithCause(e);
+        }
     }
 
     @Override
@@ -193,23 +227,45 @@ class ImageGraphicsEngine extends PDFGraphicsStreamEngine {
 
     @Override
     public void moveTo(float x, float y) throws IOException {
-
+        this.currentPoint.setLocation(x, y);
     }
 
     @Override
     public void lineTo(float x, float y) throws IOException {
 
+        String styleStr = this.getStrokeStyle();
+        AttributesImpl attrs = new AttributesImpl();
+        PDRectangle pageDim = this.getPage().getBBox();
+        double offset = pageDim.getHeight();
+        double x1 = currentPoint.getX();
+        double y1 = offset - currentPoint.getY();
+        double x2 = x;
+        double y2 = offset - y;
+
+        attrs.addAttribute("", "x1", "x1", "CDATA", String.valueOf(x1));
+        attrs.addAttribute("", "y1", "y1", "CDATA", String.valueOf(y1));
+        attrs.addAttribute("", "x2", "x2", "CDATA", String.valueOf(x2));
+        attrs.addAttribute("", "y2", "y2", "CDATA", String.valueOf(y2));
+        attrs.addAttribute("", "style", "style", "CDATA", styleStr);
+        this.currentPoint.setLocation(x, y);
+        try {
+            xhtml.startElement("line", attrs);
+            xhtml.characters("");
+            xhtml.endElement("line");
+        } catch (SAXException e) {
+            throw new IOExceptionWithCause(e);
+        }
     }
 
     @Override
     public void curveTo(float x1, float y1, float x2, float y2, float x3, float y3)
             throws IOException {
-
+        this.currentPoint.setLocation(x3, y3);
     }
 
     @Override
     public Point2D getCurrentPoint() throws IOException {
-        return new Point2D.Float(0, 0);
+        return this.currentPoint;
     }
 
     @Override
@@ -273,6 +329,7 @@ class ImageGraphicsEngine extends PDFGraphicsStreamEngine {
 
     private void processImage(PDImage pdImage, int imageNumber) throws IOException, TikaException, SAXException {
         //this is the metadata for this particular image
+        System.out.println("processing embedded image....");
         Metadata metadata = new Metadata();
         String suffix = getSuffix(pdImage, metadata);
         String fileName = "image" + imageNumber + "." + suffix;
