@@ -59,6 +59,7 @@ import org.apache.pdfbox.pdmodel.PDPageTree;
 import org.apache.pdfbox.pdmodel.common.COSObjectable;
 import org.apache.pdfbox.pdmodel.common.PDDestinationOrAction;
 import org.apache.pdfbox.pdmodel.common.PDNameTreeNode;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.common.filespecification.PDComplexFileSpecification;
 import org.apache.pdfbox.pdmodel.common.filespecification.PDEmbeddedFile;
 import org.apache.pdfbox.pdmodel.common.filespecification.PDFileSpecification;
@@ -214,7 +215,16 @@ class AbstractPDF2XHTML extends PDFTextStripper {
     @Override
     protected void startPage(PDPage page) throws IOException {
         try {
-            xhtml.startElement("div", "class", "page");
+            xhtml.startElement("br");
+            xhtml.endElement("br");
+            AttributesImpl attrs = new AttributesImpl();
+            attrs.addAttribute("", "class", "class", "CDATA", "page");
+            PDRectangle bBox = page.getBBox();
+            String pageDims = "height:" + bBox.getHeight() + "px; width:" + bBox.getWidth() + "px;";
+            attrs.addAttribute("", "style", "style", "CDATA", pageDims + " position: relative;border: 3px solid #7FFFD4;padding: 10em;");
+            xhtml.startElement("div", attrs);
+
+            // xhtml.startElement("div", "class", "page");
         } catch (SAXException e) {
             throw new IOException("Unable to start a page", e);
         }
