@@ -91,6 +91,9 @@ public class TesseractOCRConfig implements Serializable {
     private int resize = 200;
     // runtime switch to turn off OCR
     private boolean skipOcr = false;
+    // runtime switch to use correct oem
+    private String ocrEngineMode = "3";
+
     // Maximum time (seconds) to wait for the ocring process termination
     private int timeoutSeconds = 120;
     // See addOtherTesseractConfig.
@@ -445,6 +448,22 @@ public class TesseractOCRConfig implements Serializable {
         this.skipOcr = skipOcr;
         userConfigured.add("skipOcr");
     }
+
+    public String getOcrEngineMode() {
+        return ocrEngineMode;
+    }
+
+    /**
+     * Set OCR Engine modes
+     * set this to <code>0, 1, 2 or 3</code>
+     *
+     * @param ocrEngineMode
+     */
+    public void setOcrEngineMode(String ocrEngineMode) {
+        this.ocrEngineMode = ocrEngineMode;
+        userConfigured.add("ocrEngineMode");
+    }
+
 
     /**
      * @return the resize

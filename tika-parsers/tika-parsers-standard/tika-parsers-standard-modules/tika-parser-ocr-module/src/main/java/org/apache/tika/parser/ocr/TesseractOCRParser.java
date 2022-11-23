@@ -380,7 +380,7 @@ public class TesseractOCRParser extends AbstractExternalProcessParser implements
 
         ArrayList<String> cmd = new ArrayList<>(
                 Arrays.asList(getTesseractPath() + getTesseractProg(), input.getPath(),
-                        output.getPath(), "--psm", config.getPageSegMode()));
+                        output.getPath(), "--psm", config.getPageSegMode(), "--oem", config.getOcrEngineMode()));
         //if --psm == 0, don't add anything else to the command line
         if (! "0".equals(config.getPageSegMode())) {
             if (!StringUtils.isBlank(config.getLanguage())) {
