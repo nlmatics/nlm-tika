@@ -152,9 +152,9 @@ public class GraphicsStreamProcessor extends PDFGraphicsStreamEngine
             try {
                 AttributesImpl attrs = new AttributesImpl();
                 attrs.addAttribute("", "x1", "x1", "CDATA", String.valueOf(txmPoint1.getX()));
-                attrs.addAttribute("", "x2", "x2", "CDATA", String.valueOf(txmPoint1.getY()));
-                attrs.addAttribute("", "x3", "x3", "CDATA", String.valueOf(txmPoint2.getX()));
-                attrs.addAttribute("", "x4", "x4", "CDATA", String.valueOf(txmPoint2.getY()));
+                attrs.addAttribute("", "y1", "y1", "CDATA", String.valueOf(txmPoint1.getY()));
+                attrs.addAttribute("", "x2", "x2", "CDATA", String.valueOf(txmPoint2.getX()));
+                attrs.addAttribute("", "y2", "y2", "CDATA", String.valueOf(txmPoint2.getY()));
                 attrs.addAttribute("", "style", "style", "CDATA", styleStr);
                 xhtml.startElement("line", attrs);
                 xhtml.characters("");

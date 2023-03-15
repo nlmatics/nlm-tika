@@ -31,7 +31,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.IOExceptionWithCause;
-import org.apache.pdfbox.cos.COSArray;
+import org.apache.pdfbox.cos.COSArray;his
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSStream;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -329,7 +329,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
         }
         float endX = 0;
         float endY = 0;
-        float top = goodPositions.get(0).getYDirAdj() - 2*goodPositions.get(0).getYScale();
+        float top = goodPositions.get(0).getYDirAdj() - goodPositions.get(0).getYScale();
         float height = goodPositions.get(0).getHeightDir();
 
         splitPoints.add(0);
@@ -346,7 +346,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             float fontSize = s.getYScale();
             float fontSpaceWidth = s.getWidthOfSpace();
             float startX = s.getXDirAdj();
-            float startY = s.getYDirAdj();
+            float startY = s.getYDirAdj() - s.getYScale();
             endX = startX + s.getWidthDirAdj();
             endY = startY;
             String fontType = fd.getFontFamily();
@@ -455,7 +455,7 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             String spanText = String.join(" ", words.subList(splitStart, splitEnd));
             String topStr = "top:" + Float.toString(top) + "px;";
             String val =
-                "height:" + height + ";" +
+                "height:" + height + ";margin-top: 0px;" +
                 fontSizeStr +
                 fontTypeStr +
                 fontStyleStr +
