@@ -13,6 +13,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * 
+ * ------------------------------------------------------------
+ * Modifications to source code by Ambika Sukla, Nlmatics Corp.
+ * ------------------------------------------------------------
+ * Changed source code to include font and co-ordinates information of each extracted text element.
+ * 
  */
 package org.apache.tika.parser.pdf;
 

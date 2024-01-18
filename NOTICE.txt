@@ -1566,3 +1566,22 @@ PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIG
 HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+--------------------
+Modifications by Ambika Sukla, Nlmatics Corp.
+
+1. File: org/apache/tika/parser/pdf/PDF2XHTML.java
+
+Changed source code to include font and co-ordinates information of each extracted text element.
+
+2. File: org/apache/tika/parser/pdf/AbstractPDF2XHTML.java
+
+Changed source code to include font and co-ordinates and some color/graphics information of each extracted text element.
+
+3. File: org/apache/tika/parser/pdf/GraphicsStreamProcessor.java
+
+Added above source code to detect lines and rectangles to help detect tables
+
+4. Files: java/org/apache/tika/parser/ocr/TesseractOCRParser.java, java/org/apache/tika/parser/ocr/TesseractOCRParser.java
+
+Made slight changes to improve OCR
