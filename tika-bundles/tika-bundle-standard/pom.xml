@@ -162,10 +162,10 @@
               fontbox|
               jempbox|
               xmpbox|
-              bcmail-jdk15on|
-              bcprov-jdk15on|
-              bcpkix-jdk15on|
-              bcutil-jdk15on|
+              bcmail-jdk18on|
+              bcprov-jdk18on|
+              bcpkix-jdk18on|
+              bcutil-jdk18on|
               poi|
               poi-scratchpad|
               poi-ooxml|

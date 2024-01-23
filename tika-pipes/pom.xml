@@ -30,7 +30,7 @@
   <packaging>pom</packaging>
 
   <properties>
-    <netty.version>4.1.84.Final</netty.version>
+    <netty.version>4.1.94.Final</netty.version>
   </properties>
 
   <modules>
@@ -55,7 +55,7 @@
       <dependency>
         <groupId>com.azure</groupId>
         <artifactId>azure-storage-blob</artifactId>
-        <version>12.17.1</version>
+        <version>12.25.1</version>
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>

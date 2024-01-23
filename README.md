@@ -12,6 +12,25 @@ Tika is a project of the [Apache Software Foundation](https://www.apache.org).
 
 Apache Tika, Tika, Apache, the Apache feather logo, and the Apache Tika project logo are trademarks of The Apache Software Foundation.
 
+Modifications by Ambika Sukla, Nlmatics Corp.
+======================
+
+1. File: org/apache/tika/parser/pdf/PDF2XHTML.java
+
+Changed source code to include font and co-ordinates information of each extracted text element.
+
+2. File: org/apache/tika/parser/pdf/AbstractPDF2XHTML.java
+
+Changed source code to include font and co-ordinates and some color/graphics information of each extracted text element.
+
+3. File: org/apache/tika/parser/pdf/GraphicsStreamProcessor.java
+
+Added above source code to detect lines and rectangles to help detect tables
+
+4. Files: java/org/apache/tika/parser/ocr/TesseractOCRParser.java, java/org/apache/tika/parser/ocr/TesseractOCRParser.java
+
+Made slight changes to improve OCR
+
 Getting Started
 ===============
 Pre-built binaries of Apache Tika standalone applications are available

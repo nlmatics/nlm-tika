@@ -51,8 +51,8 @@
     <module>tika-eval</module>
     <module>tika-fuzzing</module>
     <module>tika-translate</module>
-    <module>tika-example</module>
-    <module>tika-java7</module>
+    <!-- <module>tika-example</module>
+    <module>tika-java7</module> -->
   </modules>
 
   <profiles>
