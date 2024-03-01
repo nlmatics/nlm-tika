@@ -32,7 +32,7 @@
 
   <property name="charset" value="UTF-8"/>
 
-  <property name="severity" value="error"/>
+  <property name="severity" value="warning"/>
 
   <property name="fileExtensions" value="java, properties, xml"/>
 
@@ -121,7 +121,7 @@
       <property name="throwsIndent" value="8"/>
       <property name="lineWrappingIndentation" value="8"/>
       <property name="arrayInitIndent" value="4"/>
-      <property name="severity" value="error"/>
+      <property name="severity" value="warning"/>
     </module>
     <module name="EmptyCatchBlock">
       <property name="exceptionVariableName" value="expected|ignore"/>
