@@ -355,9 +355,10 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             float startY = s.getYDirAdj() - s.getYScale();
             endX = startX + s.getWidthDirAdj();
             endY = startY;
-            String fontType = fd.getFontFamily();
+            String fontType = null;
+            if(fd != null){ fontType = fd.getFontFamily();}
 //            System.out.println(s.toString() + "->startX: " + startX + ", endX: " + endX + ", startY: " + startY + ", endY: " + endY);
-            if (fontType == null) {
+            if (fontType == null && fd != null) {
                 fontType = fd.getFontName();
                 if (fontType.contains("+")) {
                     fontType = fontType.split("\\+")[1];
@@ -381,15 +382,15 @@ class PDF2XHTML extends AbstractPDF2XHTML {
                     fontWeight = "bold";
                 }
             }
-
-            float fw = fd.getFontWeight();
-            if (fontWeight.equals("normal") && fw >= 100) {
-                fontWeight = Float.toString(fw);
-            }
-            if (fd.getItalicAngle() != 0) {
-                fontStyle = "italic";
-            }
-
+            if(fd != null){
+            	float fw = fd.getFontWeight();
+            	if (fontWeight.equals("normal") && fw >= 100) {
+                	fontWeight = Float.toString(fw);
+            	}
+            	if (fd.getItalicAngle() != 0) {
+                	fontStyle = "italic";
+            	}
+	    }
             String currChar = sanitizeText(s);
 //            System.out.println(">" + currChar + "->" + currChar.equals(" "));
             if (currChar.equals(" ")) {//end of word
