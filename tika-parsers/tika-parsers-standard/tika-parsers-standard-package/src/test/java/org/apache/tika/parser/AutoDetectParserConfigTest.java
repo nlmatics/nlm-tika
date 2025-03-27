@@ -16,7 +16,12 @@
  */
 package org.apache.tika.parser;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -95,5 +100,84 @@ public class AutoDetectParserConfigTest extends TikaTest {
         String txt = getXML("testPPT_EmbeddedPDF.pptx", p).xml;
         assertContainsCount("THE APACHE TIKA PROJECT WAS FORMALLY", txt, 2);
         assertContainsCount("15.9.2007 11:02", txt, 2);
+    }
+
+    @Test
+    public void testDigests() throws Exception {
+        //test to make sure that the decorator is only applied once for
+        //legacy (e.g. not RecursiveParserWrapperHandler) parsing
+        TikaConfig tikaConfig = null;
+        try (InputStream is = AutoDetectParserConfigTest.class.getResourceAsStream(
+                "/configs/tika-config-digests.xml")) {
+            tikaConfig = new TikaConfig(is);
+        }
+        Parser p = new AutoDetectParser(tikaConfig);
+        List<Metadata> metadataList = getRecursiveMetadata("testPPT_EmbeddedPDF.pptx", p);
+        assertEquals("SO67W5OGGMOFPMFQTHTNL5YU5EQXWPMNEPU7HKOZX2ULHRQICRZA====",
+                metadataList.get(0).get("X-TIKA:digest:SHA256"));
+
+        assertEquals("a16f14215ebbfa47bd995e799f03cb18",
+                metadataList.get(0).get("X-TIKA:digest:MD5"));
+
+        assertEquals("Q7D3RFV6DNGZ4BQIS6UKNWX4CDIKPIGDU2D7ADBUDVOBYSZHF7FQ====",
+                metadataList.get(6).get("X-TIKA:digest:SHA256"));
+        assertEquals("90a8b249a6d6b6cb127c59e01cef3aaa",
+                metadataList.get(6).get("X-TIKA:digest:MD5"));
+    }
+
+    @Test
+    public void testDigestsSkipContainer() throws Exception {
+        //test to make sure that the decorator is only applied once for
+        //legacy (e.g. not RecursiveParserWrapperHandler) parsing
+        TikaConfig tikaConfig = null;
+        try (InputStream is = AutoDetectParserConfigTest.class.getResourceAsStream(
+                "/configs/tika-config-digests-skip-container.xml")) {
+            tikaConfig = new TikaConfig(is);
+        }
+        Parser p = new AutoDetectParser(tikaConfig);
+        List<Metadata> metadataList = getRecursiveMetadata("testPPT_EmbeddedPDF.pptx", p);
+        assertNull(metadataList.get(0).get("X-TIKA:digest:SHA256"));
+        assertNull(metadataList.get(0).get("X-TIKA:digest:MD5"));
+
+        assertEquals("Q7D3RFV6DNGZ4BQIS6UKNWX4CDIKPIGDU2D7ADBUDVOBYSZHF7FQ====",
+                metadataList.get(6).get("X-TIKA:digest:SHA256"));
+        assertEquals("90a8b249a6d6b6cb127c59e01cef3aaa",
+                metadataList.get(6).get("X-TIKA:digest:MD5"));
+    }
+
+    @Test
+    public void testDigestsEmptyParser() throws Exception {
+        //TIKA-3939 -- ensure that digesting happens even with EmptyParser
+        TikaConfig tikaConfig = null;
+        try (InputStream is = OOXMLParserTest.class.getResourceAsStream(
+                "/configs/tika-config-digests-pdf-only.xml")) {
+            tikaConfig = new TikaConfig(is);
+        }
+        Parser p = new AutoDetectParser(tikaConfig);
+        List<Metadata> metadataList = getRecursiveMetadata("testPDF.pdf", p);
+        assertEquals(1, metadataList.size());
+        assertEquals("4ef0d3bdb12ba603f4caf7d2e2c6112e",
+                metadataList.get(0).get("X-TIKA:digest:MD5"));
+        assertEquals("org.apache.tika.parser.EmptyParser",
+                metadataList.get(0).get("X-TIKA:Parsed-By"));
+    }
+
+    @Test
+    public void testContainerZeroBytes() throws Exception {
+        Path tmp = Files.createTempFile("tika-test", "");
+        try {
+            TikaConfig tikaConfig = null;
+            try (InputStream is = AutoDetectParserConfigTest.class.getResourceAsStream(
+                    "/configs/tika-config-digests.xml")) {
+                tikaConfig = new TikaConfig(is);
+            }
+            Parser p = new AutoDetectParser(tikaConfig);
+            List<Metadata> metadataList = getRecursiveMetadata(tmp, p, true);
+            assertEquals("d41d8cd98f00b204e9800998ecf8427e",
+                    metadataList.get(0).get("X-TIKA:digest:MD5"));
+            assertEquals("0", metadataList.get(0).get(Metadata.CONTENT_LENGTH));
+        } finally {
+            Files.delete(tmp);
+        }
     }
 }

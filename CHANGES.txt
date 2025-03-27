@@ -1,3 +1,198 @@
+Release 2.9.2 - 3/26/2024
+
+   * Dependency upgrades including temporary workarounds for regressions in commons-compress.
+
+   * Add detection for OpenSCAD, 3MF, AMF, STL file formats via Robin Schimpf (TIKA-4222, TIKA-4223,
+     TIKA-4224, TIKA-4225).
+
+Release 2.9.1 - 10/17/2023
+
+   * Dependency upgrades including commons-compress to fix CVE-2023-42503.
+
+   * Improve RFC822 detection (TIKA-4153).
+
+   * Enable configuration of "maxJsonStringFieldLength" in TikaConfig to allow users to
+     avoid DEFAULT_MAX_STRING_LEN exceptions from Jackson (TIKA-4154).
+
+   * Fix bug in DateUtils that stripped timezone information from
+     incoming Calendar objects (TIKA-4126).
+
+   * The InputStreamDigester now calculates stream length (TIKA-4016).
+
+Release 2.9.0 - 8/23/2023
+
+   * With user configuration, the PDFParser can now throw an EncryptedDocumentException
+     for Microsoft IRM PDF containers with encrypted payloads. Separately,
+     the PDFParser now throws an EncryptedDocumentException instead of an IOException
+     if the security handler cannot be found (TIKA-4082).
+
+   * Fix bug that led to duplicate extraction of macros from some OLE2 containers (TIKA-4116).
+
+   * Parse iframe's srcdoc as an embedded file (TIKA-3109).
+
+   * Add detection of warc.gz as a specialization of gz and parse as if a standard WARC (TIKA-4048).
+
+   * Allow users to modify the attachment limit size in the /unpack resource (TIKA-4039)
+   
+   * Fixed write limit bug in RecursiveParserWrapper (TIKA-4055).
+
+   * Add mime detection for many files with thanks to Gregory Lepore (TIKA-3992).
+   
+   * Fixed iWork 13 keynote detection on files with wrong extension (TIKA-4111).
+
+Release 2.8.0 - 5/11/2023
+
+   * Enable counting and/or parsing of incremental updates in PDFs.  This
+     is an experimental feature and may change in later releases (TIKA-4017).
+
+   * Fixed bug that prevented the the loading of CompositeExternalParser in tika-app and
+     tika-server-standard. This parser will call exiftool and ffmpeg if those are installed, as was
+     the behavior in Tika 1.x. Exclude org.apache.tika.parser.external.CompositeExternalParser
+     if you do not want this behavior (TIKA-4022).
+
+   * Removed the shading of tika-parsers-standard-module (TIKA-4038).
+
+   * Enable optional extraction of file system metadata in FileSystemFetcher (TIKA-4035).
+
+   * Allow pretty printing in FileSystemEmitter (TIKA-4034).
+
+   * Add detection for and a new mime type for older postscript-based
+     Adobe Illustrator "application/illustrator+ps" files (TIKA-3971).
+
+   * Add magic detection for canon raw file types: crw, cr2 and cr3 (TIKA-3991).
+
+   * Add detection for ONIX message files (TIKA-4011).
+
+   * Add detection and a parser for ActiveMime files (TIKA-3987).
+
+   * Add extraction of rendition layout value and version from Epub (TIKA-4013).
+
+   * Improve embedded file extraction from PDFs (TIKA-4012).
+
+   * Improve metadata extraction from WARCs (TIKA-4018).
+
+   * Update to PDFBox 2.0.28 (TIKA-4016).
+
+   * Users may now avoid the ZeroByteFileException via a
+     setting on the AutoDetectParserConfig (TIKA-3976).
+
+   * Fix bug in closing <a> elements in the presence of <b> elements
+     in RTF files (TIKA-3972).
+
+   * Improve extraction of embedded file names in .docx (TIKA-3968).
+
+   * Normalize author, title, subject and description to their Dublin Core
+     properties in the HTMLParser (TIKA-3963).
+
+
+Release 2.7.0 - 1/31/2023
+
+   * Add SVG detection for svg files that lack the xml header (TIKA-3308).
+
+   * Migrate to a live fork of Universal Charset Detector (TIKA-3213).
+
+   * Improve handling of text-based attachments inside .eml files (TIKA-3959).
+
+   * Add tika-parser-nlp-package to release artifacts (TIKA-3958).
+
+   * Remove need for <params/> element in classes that extend ConfigBase (TIKA-3946).
+
+   * Add X-TIKA:embedded_id_path to ensure unique embedded file paths (TIKA-3942).
+
+   * Fix bug that prevented digests when the fallback/EmptyParser
+     was called (TIKA-3939).
+
+   * Remove log4j 1.2.x (and slf4j-log4j12 which now redirects to slf4j-reload4j) from
+     all modules (TIKA-3935).
+
+   * Upgrade mime4j to 0.8.9 (TIKA-3950).
+
+   * Refactor date parsing for emails (TIKA-3957)
+
+   * Upgrade to Bouncy Castle 1.71 and jdk18on jars (TIKA-3933).
+
+   * Add a JDBCPipesReporter (TIKA-3931).
+
+   * Add multivalued field strategy option in jdbc-emitter (TIKA-3930).
+     Default is now 'concatenate' with ', ' as the delimiter.
+
+   * Downgrade logging in PipesClient for each parse from info to debug.
+
+Release 2.6.0 - 11/3/2022
+
+   * Add optional Siegfried detector (TIKA-3901).
+
+   * Move OverrideDetector's functionality to the CompositeDetector (TIKA-3904).
+
+   * The FileCommandDetector has been refactored to have the same
+     behavior as the Siegfried detector; see setUseMime in the javadoc (TIKA-3902).
+
+   * Fix bug in OpenSearch emitter that prevented upserts on
+     documents with embedded files (TIKA-3882).
+
+   * Extract PDF actions and triggers into the file's metadata (TIKA-3887).
+
+   * Add a tika-async-cli module (TIKA-3885).
+
+   * Fetch keys sent via headers to tika server are now URL decoded (TIKA-3864).
+
+
+Release 2.5.0 - 09/30/2022
+
+   * Improved extraction of PDF subset info for PDF/UA, PDF/VT, and PDF/X.
+     NOTE: we no longer append PDF/A information, e.g. 'version="A-1b"'
+     to the 'dc:format'. Users must now get that information from the
+     'pdfa:PDFVersion' key or from 'pdfaid:conformance'
+     and 'pdfaid:part' (TIKA-3844).
+
+   * Avoid infinite loop in bookmark extraction from PDFs (TIKA-3832).
+
+   * Upgraded to slf4j 2.0.1 (TIKA-3842).
+
+   * Added upsert option for the OpenSearch emitter (TIKA-3855).
+
+   * Extract PDF signature information at the document level
+     into the metadata (TIKA-3852).
+
+   * Enable configuration of digests via AutoDetectParserConfig (TIKA-3853).
+
+   * Use commons-io byte array streams via PJ Fanning (TIKA-3843).
+
+   * Upgrade to PDFBox 2.0.27 (TIKA-3866).
+
+   * Upgrade to JempBox 1.8.17 (TIKA-3856).
+
+   * Add extraction of ODF version from ODF files (TIKA-3840).
+
+   * tika-parser-html-commons (BoilerPipeHandler) is no longer a
+     a dependency of tika-parser-html-module. tika-app and tika-server-standard
+     have added a dependency on tika-parser-html-commons.  However,
+     users who are managing custom dependencies and who want the BoilerPipeHandler
+     will have to now include the tika-parser-html-commons dependency
+     (TIKA-1484).
+
+   * Add unrar as an optional parser (TIKA-3800).
+
+   * Refactor FuzzingCLI to use PipesParser (TIKA-3799).
+
+   * ServiceLoader's loadServiceProviders() now guarantees
+     unique classes (TIKA-3797).
+
+   * Fix bug that prevented setting of includeHeadersAndFooters
+     for xls, xlsx, doc and docx via tika-config (TIKA-3796).
+
+   * Fix bug that prevented specification of rendered image type
+     via http header in the PDFParser (TIKA-3794).
+
+   * Fix bug causing some Exif dates to be decoded wrongly on
+     timezones different than UTC (TIKA-3815).
+
+   * Numerous dependency upgrades (TIKA-3795).
+
+   * Add ALPHA-level initial releases of JDBCEmitter,
+     FileSystemStatusReporter and OpenSearchPipesReporter.
+     These may have breaking changes in subsequent releases.
+
 Release 2.4.1 - 06/14/2022
 
    * Implement bulk upload in the OpenSearch emitter (TIKA-3791).

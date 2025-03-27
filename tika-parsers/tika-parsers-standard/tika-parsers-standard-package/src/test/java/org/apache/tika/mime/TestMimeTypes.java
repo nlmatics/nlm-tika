@@ -185,6 +185,16 @@ public class TestMimeTypes {
     }
 
     @Test
+    public void testPostscriptBasedIllustrator() throws Exception {
+        //if all we have is the name, default to pdf based illustrator
+        assertTypeByName("application/illustrator", "testAI_PS.ai");
+        //if we have bytes, get it right
+        assertTypeByData("application/illustrator+ps", "testAI_PS.ai");
+        //if we have name and bytes, get it right
+        assertTypeByNameAndData("application/illustrator+ps", "testAI_PS.ai");
+
+    }
+    @Test
     public void testDigiliteFDF() throws Exception {
         //not to be confused with Adobe's .fdf!
         assertTypeByData("application/vnd.digilite.prolights", "testDigilite.fdf");
@@ -194,6 +204,24 @@ public class TestMimeTypes {
     @Test
     public void testXDP() throws Exception {
         assertTypeDetection("testXDP.xdp", "application/vnd.adobe.xdp+xml");
+    }
+
+    @Test
+    public void testSRT() throws Exception {
+        assertTypeByData("application/x-subrip", "test_subrip.srt");
+        assertTypeByNameAndData("application/x-subrip", "test_subrip.srt");
+    }
+
+    @Test
+    public void testSTL() throws Exception {
+        assertTypeByNameAndData("model/x.stl-binary", "testSTL-binary.stl");
+        assertTypeByNameAndData("model/x.stl-ascii", "testSTL-ascii.stl");
+    }
+
+    @Test
+    public void testTTML() throws Exception {
+        assertTypeByData("application/ttml+xml", "test_ttml.ttml");
+        assertTypeByNameAndData("application/ttml+xml", "test_ttml.ttml");
     }
 
     @Test
@@ -384,6 +412,9 @@ public class TestMimeTypes {
         assertTypeByName("application/x-cpio", "test.cpio");
         assertTypeByName("application/vnd.ms-cab-compressed", "test.cab");
 
+        assertTypeByNameAndData("application/x-bzip2", "test-bz2.txt.bz2");
+        assertTypeByName("application/x-bzip2", "test-bz2.txt.bz2");
+        assertTypeByData("application/x-bzip2", "test-bz2.txt.bz2");
         // TODO Add an example .deb and .udeb, then check these
 
         // Check the mime magic patterns for them work too
@@ -400,7 +431,7 @@ public class TestMimeTypes {
         assertTypeByData("application/octet-stream", "test-documents-spanned.zip");
         assertTypeByData("application/zip", "test-documents-spanned.z01");
 
-        assertTypeDetection("testZSTD.zstd", "application/zstd");
+        assertTypeDetection("testZSTD.zst", "application/zstd");
     }
 
     @Test
@@ -547,6 +578,11 @@ public class TestMimeTypes {
     }
 
     @Test
+    public void testOS2BitmapArray() throws Exception {
+        assertTypeByData("image/x-os2-graphics; charset=binary", "testOS2BitmapArray");
+    }
+
+    @Test
     public void testPnmDetection() throws Exception {
         assertType("image/x-portable-bitmap", "testPBM.pbm");
         assertType("image/x-portable-graymap", "testPGM.pgm");
@@ -604,6 +640,7 @@ public class TestMimeTypes {
         assertTypeByData("image/svg+xml", "testSVG.svg");
         assertTypeByName("image/svg+xml", "x.svg");
         assertTypeByName("image/svg+xml", "x.SVG");
+        assertTypeByData("image/svg+xml", "testSVG_no_xml_header.svg");
 
         // Should *.svgz be svg or gzip
         assertType("application/gzip", "testSVG.svgz");
@@ -829,7 +866,8 @@ public class TestMimeTypes {
         assertTypeByName("image/x-raw-hasselblad", "x.3fr");
         assertTypeByName("image/x-raw-fuji", "x.raf");
         assertTypeByName("image/x-raw-canon", "x.crw");
-        assertTypeByName("image/x-raw-canon", "x.cr2");
+        assertTypeByName("image/x-canon-cr2", "x.cr2");
+        assertTypeByName("image/x-canon-cr3", "x.cr3");
         assertTypeByName("image/x-raw-kodak", "x.k25");
         assertTypeByName("image/x-raw-kodak", "x.kdc");
         assertTypeByName("image/x-raw-kodak", "x.dcs");
@@ -991,6 +1029,7 @@ public class TestMimeTypes {
     @Test
     public void testRobots() throws Exception {
         assertTypeByData("text/x-robots", "testRobots.txt");
+        assertTypeByData("text/x-robots", "testRobots2.txt");
     }
 
     @Test
@@ -1140,6 +1179,10 @@ public class TestMimeTypes {
         // With a custom text header
         assertType("text/vtt", "testWebVTT_header.vtt");
         assertTypeByData("text/vtt", "testWebVTT_header.vtt");
+
+        // With a UTF-8 BOM before the header
+        assertType("text/vtt", "testWebVTT_utf8.vtt");
+        assertTypeByData("text/vtt", "testWebVTT_utf8.vtt");
     }
 
     @Test
@@ -1192,6 +1235,10 @@ public class TestMimeTypes {
         assertType("text/x-vcalendar", "testVCalendar.vcs");
         assertTypeByData("text/calendar", "testICalendar.ics");
         assertTypeByData("text/x-vcalendar", "testVCalendar.vcs");
+        //TIKA-4244
+        //this tests detection with content intervening between the BEGIN:VCALENDAR and the VERSION:2.0 entry
+        assertType("text/calendar", "testICalendar_w_prodId.ics");
+        assertTypeByData("text/calendar", "testICalendar_w_prodId.ics");
     }
 
     @Test
@@ -1289,6 +1336,33 @@ public class TestMimeTypes {
     @Test
     public void testHTMLSnippetWithRFC822() throws Exception {
         assertTypeByData("text/html", "testBrokenHTMLContainingRFC822.html");
+    }
+
+    @Test
+    public void testE57() throws Exception {
+        assertTypeByName("model/e57", "testE57_header.e57");
+        assertTypeByData("model/e57", "testE57_header.e57");
+        assertTypeByNameAndData("model/e57", "testE57_header.e57");
+    }
+
+    @Test
+    public void testPGPEncrypted() throws Exception {
+        assertTypeDetection("testPGPEncrypted.gpg", "application/pgp-encrypted");
+    }
+
+    @Test
+    public void testONIX() throws Exception {
+        assertTypeByData("application/onix-message+xml", "testONIXMessage.xml");
+        assertTypeByData("application/onix-message+xml", "testONIXMessageShort.xml");
+    }
+
+    @Test
+    public void testAACDetection() throws Exception {
+        assertType("audio/x-aac", "testAAC.aac");
+        assertType("audio/x-aac", "testAACid3.aac");
+        assertTypeByData("audio/x-aac", "testAAC.aac");
+        assertTypeByData("audio/x-aac", "testAACid3.aac");
+        assertTypeByName("audio/x-aac", "x.aac");
     }
 
     private void assertText(byte[] prefix) throws IOException {

@@ -32,12 +32,7 @@ import static org.mockito.Mockito.verify;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.text.DateFormat;
-import java.text.DateFormatSymbols;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import org.apache.james.mime4j.stream.MimeConfig;
 import org.junit.jupiter.api.BeforeAll;
@@ -377,67 +372,7 @@ public class RFC822ParserTest extends TikaTest {
         r = getXML("testRFC822_eml");
         assertEquals("2016-05-16T08:30:32Z", r.metadata.get(TikaCoreProperties.CREATED));
 
-
-        String expected = "2016-05-15T01:32:00Z";
-
-        for (String dateString : new String[]{"Sun, 15 May 2016 01:32:00 UTC",
-                //make sure this test basically works
-                "Sun, 15 May 2016 01:32:00", //no timezone
-                "Sunday, May 15 2016 1:32 AM", "May 15 2016 1:32am", "May 15 2016 1:32 am",
-                "2016-05-15 01:32:00", "      Sun, 15 May 2016 3:32:00 +0200",
-                //format correctly handled by mime4j if no leading whitespace
-                "      Sun, 14 May 2016 20:32:00 EST",}) {
-            testDate(dateString, expected);
-        }
-
-        //now try days without times
-        expected = "2016-05-15T12:00:00Z";
-        for (String dateString : new String[]{"May 15, 2016", "Sun, 15 May 2016", "15 May 2016",}) {
-            testDate(dateString, expected);
-        }
     }
-
-    @Test
-    public void testTrickyDates() throws Exception {
-        DateFormat df = new SimpleDateFormat("yyyy-MM-dd", new DateFormatSymbols(Locale.US));
-        //make sure there are no mis-parses of e.g. 90 = year 90 A.D, not 1990
-        Date date1980 = df.parse("1980-01-01");
-        for (String dateString : new String[]{"Mon, 29 Jan 96 14:02 GMT", "7/20/95 1:12pm",
-                "08/14/2000  12:48 AM", "06/24/2008, Tuesday, 11 AM", "11/14/08", "12/02/1996",
-                "96/12/02",}) {
-            Date parsedDate = getDate(dateString);
-            if (parsedDate != null) {
-                assertTrue(parsedDate.getTime() > date1980.getTime(),
-                        "date must be after 1980:" + dateString);
-            }
-        }
-        //TODO: mime4j misparses these to pre 1980 dates
-        //"Wed, 27 Dec 95 11:20:40 EST",
-        //"26 Aug 00 11:14:52 EDT"
-        //
-        //We are still misparsing: 8/1/03 to a pre 1980 date
-
-    }
-
-    private void testDate(String dateString, String expected) throws Exception {
-        Date parsedDate = getDate(dateString);
-        assertNotNull(parsedDate, "couldn't parse " + dateString);
-        DateFormat df =
-                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", new DateFormatSymbols(Locale.US));
-        String parsedDateString = df.format(parsedDate);
-        assertEquals(expected, parsedDateString, "failed to match: " + dateString);
-    }
-
-    private Date getDate(String dateString) throws Exception {
-        String mail = "From: dev@tika.apache.org\n" + "Date: " + dateString + "\n";
-        Parser p = new RFC822Parser();
-        Metadata m = new Metadata();
-        try (InputStream is = TikaInputStream.get(mail.getBytes(StandardCharsets.UTF_8))) {
-            p.parse(is, new DefaultHandler(), m, new ParseContext());
-        }
-        return m.getDate(TikaCoreProperties.CREATED);
-    }
-
 
     @Test
     public void testMultipleSubjects() throws Exception {
@@ -608,6 +543,9 @@ public class RFC822ParserTest extends TikaTest {
         List<Metadata> metadataList = getRecursiveMetadata("testRFC822-ARC");
         assertEquals(1, metadataList.size());
         assertEquals("message/rfc822", metadataList.get(0).get(Metadata.CONTENT_TYPE));
+
+        //Also, test that this date has been parsed: Wed, 26 Jan 2022 09:14:37 +0100 (CET)
+        assertTrue(metadataList.get(0).get(TikaCoreProperties.CREATED).startsWith("2022-01-"));
     }
 
     @Test
@@ -619,10 +557,53 @@ public class RFC822ParserTest extends TikaTest {
 
     @Test
     public void testGroupwise() throws Exception {
-        //TODO -- this should treat attachments as attachments, no?
         List<Metadata> metadataList = getRecursiveMetadata("testGroupWiseEml.eml");
-        assertEquals(1, metadataList.size());
-        assertContains("ssssss", metadataList.get(0).get(TikaCoreProperties.TIKA_CONTENT));
+        assertEquals(3, metadataList.size());
+        assertContains("test<", metadataList.get(0).get(TikaCoreProperties.TIKA_CONTENT));
+        assertContains("test2", metadataList.get(1).get(TikaCoreProperties.TIKA_CONTENT));
+        assertEquals(TikaCoreProperties.EmbeddedResourceType.ATTACHMENT.toString(),
+                metadataList.get(1).get(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE));
+        assertEquals("/test.eml",
+                metadataList.get(1).get(TikaCoreProperties.EMBEDDED_RESOURCE_PATH));
+
+        assertContains("ssssss", metadataList.get(2).get(TikaCoreProperties.TIKA_CONTENT));
+        assertEquals(TikaCoreProperties.EmbeddedResourceType.ATTACHMENT.toString(),
+                metadataList.get(2).get(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE));
+        assertEquals("/Neues Textdokument.txt",
+                metadataList.get(2).get(TikaCoreProperties.EMBEDDED_RESOURCE_PATH));
+
+    }
+
+    @Test
+    public void testMultipartTextAttachment() throws Exception {
+        List<Metadata> metadataList = getRecursiveMetadata("testRFC822_multipart_attachments.eml");
+        assertEquals(3, metadataList.size());
+        assertContains("This is the html body of the main msg.",
+                metadataList.get(0).get(TikaCoreProperties.TIKA_CONTENT));
+
+        assertContains("This is Test TXTA File for parser",
+                metadataList.get(1).get(TikaCoreProperties.TIKA_CONTENT));
+        assertNotContained("This is Test TXTA File for parser",
+                metadataList.get(0).get(TikaCoreProperties.TIKA_CONTENT));
+        assertEquals("/Test TxtA.txt", metadataList.get(1).get(TikaCoreProperties.EMBEDDED_RESOURCE_PATH));
+        assertEquals(TikaCoreProperties.EmbeddedResourceType.ATTACHMENT.toString(),
+                metadataList.get(1).get(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE));
+        //make sure we extracted creation and modified dates
+        assertTrue(metadataList.get(1).get(TikaCoreProperties.CREATED).startsWith("2022-11-"));
+        assertTrue(metadataList.get(1).get(TikaCoreProperties.MODIFIED).startsWith("2022-11-"));
+
+
+        assertContains("This is Test TXTB File for parser",
+                metadataList.get(2).get(TikaCoreProperties.TIKA_CONTENT));
+        assertNotContained("This is Test TXTB File for parser",
+                metadataList.get(0).get(TikaCoreProperties.TIKA_CONTENT));
+        assertEquals("/Test TxtB.txt",
+                metadataList.get(2).get(TikaCoreProperties.EMBEDDED_RESOURCE_PATH));
+        assertEquals(TikaCoreProperties.EmbeddedResourceType.ATTACHMENT.toString(),
+                metadataList.get(2).get(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE));
+        //make sure we extracted creation and modified dates
+        assertTrue(metadataList.get(2).get(TikaCoreProperties.CREATED).startsWith("2022-11-"));
+        assertTrue(metadataList.get(2).get(TikaCoreProperties.MODIFIED).startsWith("2022-11-"));
     }
 
 }

@@ -16,20 +16,22 @@
  */
 package org.apache.tika.parser.html;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.input.UnsynchronizedByteArrayInputStream;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
@@ -39,11 +41,14 @@ import org.apache.tika.extractor.EmbeddedDocumentExtractor;
 import org.apache.tika.extractor.EmbeddedDocumentUtil;
 import org.apache.tika.metadata.HTML;
 import org.apache.tika.metadata.Metadata;
+import org.apache.tika.metadata.Office;
+import org.apache.tika.metadata.Property;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.sax.TextContentHandler;
 import org.apache.tika.sax.XHTMLContentHandler;
+import org.apache.tika.utils.StringUtils;
 
 class HtmlHandler extends TextContentHandler {
 
@@ -52,6 +57,16 @@ class HtmlHandler extends TextContentHandler {
             new HashSet<>(Arrays.asList("src", "href", "longdesc", "cite"));
     private static final Pattern ICBM =
             Pattern.compile("\\s*(-?\\d+\\.\\d+)[,\\s]+(-?\\d+\\.\\d+)\\s*");
+
+    private static final Map<String, Property> META_HEADER_MAPPINGS = new HashMap<>();
+
+    static {
+        META_HEADER_MAPPINGS.put("author", TikaCoreProperties.CREATOR);
+        META_HEADER_MAPPINGS.put("title", TikaCoreProperties.TITLE);
+        META_HEADER_MAPPINGS.put("subject", TikaCoreProperties.SUBJECT);
+        META_HEADER_MAPPINGS.put("keywords", Office.KEYWORDS);
+        META_HEADER_MAPPINGS.put("description", TikaCoreProperties.DESCRIPTION);
+    }
     private static final Attributes EMPTY_ATTS = new AttributesImpl();
     private final HtmlMapper mapper;
     private final XHTMLContentHandler xhtml;
@@ -172,6 +187,12 @@ class HtmlHandler extends TextContentHandler {
                 handleDataURIScheme(value);
             }
         }
+        if ("IFRAME".equals(name)) {
+            String srcDoc = atts.getValue("srcdoc");
+            if (!StringUtils.isBlank(srcDoc)) {
+                handleSrcDoc(srcDoc);
+            }
+        }
     }
 
     /**
@@ -179,9 +200,14 @@ class HtmlHandler extends TextContentHandler {
      * object. The name and value are normalized where possible.
      */
     private void addHtmlMetadata(String name, String value) {
-        if (name == null || value == null) {
-            // ignore
-        } else if (name.equalsIgnoreCase("ICBM")) {
+        //note that "name" derives from attributes and is not uppercased
+        //like the elements by the XHTMLDowngradeHandler
+
+        if (StringUtils.isBlank(name) || StringUtils.isBlank(value)) {
+            return;
+        }
+
+        if (name.equalsIgnoreCase("ICBM")) {
             Matcher m = ICBM.matcher(value);
             if (m.matches()) {
                 metadata.set("ICBM", m.group(1) + ", " + m.group(2));
@@ -190,7 +216,10 @@ class HtmlHandler extends TextContentHandler {
             } else {
                 metadata.set("ICBM", value);
             }
-        } else if (name.equalsIgnoreCase(Metadata.CONTENT_TYPE)) {
+            return;
+        }
+
+        if (name.equalsIgnoreCase(Metadata.CONTENT_TYPE)) {
             //don't overwrite Metadata.CONTENT_TYPE!
             MediaType type = MediaType.parse(value);
             if (type != null) {
@@ -198,9 +227,23 @@ class HtmlHandler extends TextContentHandler {
             } else {
                 metadata.set(TikaCoreProperties.CONTENT_TYPE_HINT, value);
             }
-        } else {
-            metadata.add(name, value);
+            return;
         }
+
+        String lcName = name.toLowerCase(Locale.US);
+        if (META_HEADER_MAPPINGS.containsKey(lcName)) {
+            Property property = META_HEADER_MAPPINGS.get(lcName);
+            if (property.equals(TikaCoreProperties.TITLE) && isTitleSetToMetadata) {
+                //prefer the title element if it is already set
+                //do nothing
+            } else if (property.isMultiValuePermitted()) {
+                metadata.add(property, value);
+            } else {
+                metadata.set(property, value);
+            }
+        }
+        //TODO -- we should prefix these raw names to avoid collisions
+        metadata.add(name, value);
     }
 
     private void startElementWithSafeAttributes(String name, Attributes atts) throws SAXException {
@@ -302,6 +345,22 @@ class HtmlHandler extends TextContentHandler {
             discardLevel--;
         }
     }
+    private void handleSrcDoc(String string) throws SAXException {
+        Metadata m = new Metadata();
+        m.set(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE,
+                TikaCoreProperties.EmbeddedResourceType.INLINE.toString());
+        m.set(TikaCoreProperties.CONTENT_TYPE_PARSER_OVERRIDE, "text/html");
+        //TODO add metadata about iframe content?
+        EmbeddedDocumentExtractor embeddedDocumentExtractor =
+                EmbeddedDocumentUtil.getEmbeddedDocumentExtractor(context);
+        if (embeddedDocumentExtractor.shouldParseEmbedded(m)) {
+            try (InputStream stream = new UnsynchronizedByteArrayInputStream(string.getBytes(StandardCharsets.UTF_8))) {
+                embeddedDocumentExtractor.parseEmbedded(stream, xhtml, m, true);
+            } catch (IOException e) {
+                EmbeddedDocumentUtil.recordEmbeddedStreamException(e, metadata);
+            }
+        }
+    }
 
     private void handleDataURIScheme(String string) throws SAXException {
         DataURIScheme dataURIScheme = null;
@@ -364,7 +423,7 @@ class HtmlHandler extends TextContentHandler {
             }
         }
 
-        try (InputStream stream = new ByteArrayInputStream(
+        try (InputStream stream = new UnsynchronizedByteArrayInputStream(
                 script.toString().getBytes(StandardCharsets.UTF_8))) {
             embeddedDocumentExtractor.parseEmbedded(stream, xhtml, m, true);
         } catch (IOException e) {

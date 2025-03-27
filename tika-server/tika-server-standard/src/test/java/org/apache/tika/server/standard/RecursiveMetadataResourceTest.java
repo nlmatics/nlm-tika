@@ -45,6 +45,7 @@ import org.apache.tika.metadata.OfficeOpenXMLExtended;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.metadata.serialization.JsonMetadataList;
 import org.apache.tika.server.core.CXFTestBase;
+import org.apache.tika.server.core.config.DocumentSelectorConfig;
 import org.apache.tika.server.core.resource.RecursiveMetadataResource;
 import org.apache.tika.server.core.writer.MetadataListMessageBodyWriter;
 
@@ -331,6 +332,24 @@ public class RecursiveMetadataResourceTest extends CXFTestBase {
         }
     }
 
+    // TIKA-3227
+    @Test
+    public void testSkipEmbedded() throws Exception {
+        Response response = WebClient.create(endPoint + META_PATH).accept("application/json")
+                .header(DocumentSelectorConfig.X_TIKA_SKIP_EMBEDDED_HEADER, "false")
+                .put(ClassLoader.getSystemResourceAsStream(TEST_RECURSIVE_DOC));
+        Reader reader = new InputStreamReader((InputStream) response.getEntity(), UTF_8);
+        List<Metadata> metadataList = JsonMetadataList.fromJson(reader);
+        assertEquals(12, metadataList.size());
+
+        response = WebClient.create(endPoint + META_PATH).accept("application/json")
+                .header(DocumentSelectorConfig.X_TIKA_SKIP_EMBEDDED_HEADER, "true")
+                .put(ClassLoader.getSystemResourceAsStream(TEST_RECURSIVE_DOC));
+        reader = new InputStreamReader((InputStream) response.getEntity(), UTF_8);
+        metadataList = JsonMetadataList.fromJson(reader);
+        assertEquals(1, metadataList.size());
+    }
+
     @Test
     public void testWriteLimit() throws Exception {
         int writeLimit = 10;
@@ -345,8 +364,8 @@ public class RecursiveMetadataResourceTest extends CXFTestBase {
         assertEquals(1, metadataList.size());
         assertEquals("true", metadataList.get(0).get(TikaCoreProperties.WRITE_LIMIT_REACHED));
 
-        //now try with a write limit of 200
-        writeLimit = 200;
+        //now try with a write limit of 500
+        writeLimit = 550;
         response = WebClient.create(endPoint + META_PATH).accept("application/json")
                 .header("writeLimit", Integer.toString(writeLimit))
                 .put(ClassLoader.getSystemResourceAsStream(TEST_RECURSIVE_DOC));
@@ -390,11 +409,11 @@ public class RecursiveMetadataResourceTest extends CXFTestBase {
         // Check results
         Reader reader = new InputStreamReader((InputStream) response.getEntity(), UTF_8);
         List<Metadata> metadataList = JsonMetadataList.fromJson(reader);
-        assertEquals(10, metadataList.size());
+        assertEquals(12, metadataList.size());
         assertEquals("true", metadataList.get(0).get(TikaCoreProperties.WRITE_LIMIT_REACHED));
 
-        //now try with a write limit of 200
-        writeLimit = 200;
+        //now try with a write limit of 550
+        writeLimit = 550;
         response = WebClient.create(endPoint + META_PATH).accept("application/json")
                 .header("writeLimit", Integer.toString(writeLimit))
                 .header("throwOnWriteLimitReached", "false")
@@ -404,8 +423,8 @@ public class RecursiveMetadataResourceTest extends CXFTestBase {
         // Check results
         reader = new InputStreamReader((InputStream) response.getEntity(), UTF_8);
         metadataList = JsonMetadataList.fromJson(reader);
-        assertEquals(10, metadataList.size());
-        assertEquals("true", metadataList.get(6).get(TikaCoreProperties.WRITE_LIMIT_REACHED));
+        assertEquals(12, metadataList.size());
+        assertEquals("true", metadataList.get(0).get(TikaCoreProperties.WRITE_LIMIT_REACHED));
         assertContains("When in the Course of human events it becomes necessary for one people",
                 metadataList.get(6).get(TikaCoreProperties.TIKA_CONTENT));
         TikaTest.assertNotContained("We hold these truths",

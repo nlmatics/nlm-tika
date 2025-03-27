@@ -35,6 +35,9 @@ import org.apache.tika.sax.ContentHandlerDecoratorFactory;
  * when parsing data that is extremely compressible and resembles a ZIP
  * bomb. Null values will be ignored and will not affect the default values
  * in SecureContentHandler.
+ * <p>
+ *     See <a href="https://cwiki.apache.org/confluence/display/TIKA/ModifyingContentWithHandlersAndMetadataFilters"/>ModifyingContentWithHandlersAndMetadataFilters</a>
+ *     for documentation and examples for configuring this with a tika-config.xml file.
  */
 public class AutoDetectParserConfig extends ConfigBase implements Serializable {
 
@@ -94,6 +97,10 @@ public class AutoDetectParserConfig extends ConfigBase implements Serializable {
 
     private ContentHandlerDecoratorFactory contentHandlerDecoratorFactory =
             NOOP_CONTENT_HANDLER_DECORATOR_FACTORY;
+
+    private DigestingParser.DigesterFactory digesterFactory = null;
+
+    private boolean throwOnZeroBytes = true;
 
     /**
      * Creates a SecureContentHandlerConfig using the passed in parameters.
@@ -185,6 +192,22 @@ public class AutoDetectParserConfig extends ConfigBase implements Serializable {
         return contentHandlerDecoratorFactory;
     }
 
+    public void setDigesterFactory(DigestingParser.DigesterFactory digesterFactory) {
+        this.digesterFactory = digesterFactory;
+    }
+
+    public DigestingParser.DigesterFactory getDigesterFactory() {
+        return this.digesterFactory;
+    }
+
+    public void setThrowOnZeroBytes(boolean throwOnZeroBytes) {
+        this.throwOnZeroBytes = throwOnZeroBytes;
+    }
+
+    public boolean getThrowOnZeroBytes() {
+        return throwOnZeroBytes;
+    }
+
     @Override
     public String toString() {
         return "AutoDetectParserConfig{" + "spoolToDisk=" + spoolToDisk + ", outputThreshold=" +
@@ -193,7 +216,8 @@ public class AutoDetectParserConfig extends ConfigBase implements Serializable {
                 maximumPackageEntryDepth + ", metadataWriteFilterFactory=" +
                 metadataWriteFilterFactory + ", embeddedDocumentExtractorFactory=" +
                 embeddedDocumentExtractorFactory + ", contentHandlerDecoratorFactory=" +
-                contentHandlerDecoratorFactory + '}';
+                contentHandlerDecoratorFactory + ", digesterFactory=" + digesterFactory +
+                ", throwOnZeroBytes=" + throwOnZeroBytes + '}';
     }
 }
 

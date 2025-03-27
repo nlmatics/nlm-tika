@@ -17,10 +17,12 @@
 package org.apache.tika.dl.imagerec;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.InputStream;
 
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.Test;
 
 import org.apache.tika.Tika;
@@ -31,18 +33,19 @@ public class DL4JVGG16NetTest {
 
     @Test
     public void recognise() throws Exception {
+        assumeFalse(SystemUtils.OS_ARCH.equals("aarch64"), "doesn't yet work on aarch64");
         TikaConfig config = null;
         try (InputStream is = getClass().getResourceAsStream("dl4j-vgg16-config.xml")) {
             config = new TikaConfig(is);
         } catch (Exception e) {
             if (e.getMessage() != null && (e.getMessage().contains("Connection refused") ||
-                    e.getMessage().contains("connect timed out"))) {
+                    e.getMessage().contains("connect timed out") || e.getMessage().contains("403"))) {
                 assumeTrue(false, "skipping test because of connection issue");
             }
             throw e;
         }
 
-        assumeTrue(false, "something went wrong loading tika config");
+        assumeTrue(config != null, "something went wrong loading tika config");
         Tika tika = new Tika(config);
         Metadata md = new Metadata();
         try (InputStream is = getClass().getResourceAsStream("lion.jpg")) {

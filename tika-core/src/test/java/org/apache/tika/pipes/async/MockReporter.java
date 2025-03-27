@@ -16,6 +16,8 @@
  */
 package org.apache.tika.pipes.async;
 
+import java.util.concurrent.ArrayBlockingQueue;
+
 import org.apache.tika.config.Field;
 import org.apache.tika.pipes.FetchEmitTuple;
 import org.apache.tika.pipes.PipesReporter;
@@ -23,10 +25,22 @@ import org.apache.tika.pipes.PipesResult;
 
 public class MockReporter extends PipesReporter {
 
+    static ArrayBlockingQueue<PipesResult> RESULTS = new ArrayBlockingQueue<>(10000);
+
     private String endpoint;
 
     @Override
     public void report(FetchEmitTuple t, PipesResult result, long elapsed) {
+        RESULTS.add(result);
+    }
+
+    @Override
+    public void error(Throwable t) {
+
+    }
+
+    @Override
+    public void error(String msg) {
 
     }
 

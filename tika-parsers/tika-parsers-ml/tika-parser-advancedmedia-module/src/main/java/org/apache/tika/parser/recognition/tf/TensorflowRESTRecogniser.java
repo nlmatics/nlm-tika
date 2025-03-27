@@ -17,7 +17,6 @@
 
 package org.apache.tika.parser.recognition.tf;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -34,11 +33,13 @@ import java.util.Set;
 import com.github.openjson.JSONArray;
 import com.github.openjson.JSONObject;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.ContentHandler;
@@ -106,12 +107,11 @@ public class TensorflowRESTRecogniser implements ObjectRecogniser {
 
     @Override
     public void initialize(Map<String, Param> params) throws TikaConfigException {
-        try {
-            healthUri = URI.create(apiBaseUri + "/ping");
-            apiUri = URI.create(apiBaseUri + String.format(Locale.getDefault(),
-                    "/classify/image?topn=%1$d&min_confidence=%2$f", topN, minConfidence));
+        healthUri = URI.create(apiBaseUri + "/ping");
+        apiUri = URI.create(apiBaseUri + String.format(Locale.getDefault(),
+                "/classify/image?topn=%1$d&min_confidence=%2$f", topN, minConfidence));
 
-            DefaultHttpClient client = new DefaultHttpClient();
+        try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
             HttpResponse response = client.execute(new HttpGet(healthUri));
             available = response.getStatusLine().getStatusCode() == 200;
 
@@ -134,12 +134,10 @@ public class TensorflowRESTRecogniser implements ObjectRecogniser {
                                             Metadata metadata, ParseContext context)
             throws IOException, SAXException, TikaException {
         List<RecognisedObject> recObjs = new ArrayList<>();
-        try {
-            DefaultHttpClient client = new DefaultHttpClient();
-
+        try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
             HttpPost request = new HttpPost(getApiUri(metadata));
 
-            try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream()) {
+            try (UnsynchronizedByteArrayOutputStream byteStream = UnsynchronizedByteArrayOutputStream.builder().get()) {
                 //TODO: convert this to stream, this might cause OOM issue
                 // InputStreamEntity is not working
                 // request.setEntity(new InputStreamEntity(stream, -1));

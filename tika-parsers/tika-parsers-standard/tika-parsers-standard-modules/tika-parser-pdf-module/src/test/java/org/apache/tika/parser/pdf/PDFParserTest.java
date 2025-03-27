@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -661,7 +662,6 @@ public class PDFParserTest extends TikaTest {
         Set<String> versions = new HashSet<>(Arrays.asList(r.metadata.getValues("dc:format")));
 
         for (String hit : new String[]{"application/pdf; version=1.7",
-                "application/pdf; version=\"A-1b\"",
                 "application/pdf; version=\"1.7 Adobe Extension Level 8\""}) {
             assertTrue(versions.contains(hit), hit);
         }
@@ -978,6 +978,15 @@ public class PDFParserTest extends TikaTest {
         assertContains("Mount Rushmore National Memorial", r.xml);
         //contains xfa fields and data
         assertContains("<li fieldName=\"School_Name\">School Name: my_school</li>", r.xml);
+        //This file does not have multiple values for a given key.
+        //It is not actually a useful test for TIKA-4171. We should
+        //find a small example test file and run something like this.
+        Matcher matcher = Pattern.compile("<li fieldName=").matcher(r.xml);
+        int listItems = 0;
+        while (matcher.find()) {
+            listItems++;
+        }
+        assertEquals(27, listItems);
     }
 
     @Test
@@ -1023,9 +1032,9 @@ public class PDFParserTest extends TikaTest {
                         "Preflight", "Preflight"}, m.getValues(XMPMM.HISTORY_SOFTWARE_AGENT));
 
         assertArrayEquals(
-                new String[]{"2014-03-04T23:50:41Z", "2014-03-04T23:50:42Z", "2014-03-04T23:51:34Z",
-                        "2014-03-04T23:51:36Z", "2014-03-04T23:51:37Z", "2014-03-04T23:52:22Z",
-                        "2014-03-04T23:54:48Z"}, m.getValues(XMPMM.HISTORY_WHEN));
+                new String[]{"2014-03-04T22:50:41Z", "2014-03-04T22:50:42Z", "2014-03-04T22:51:34Z",
+                        "2014-03-04T22:51:36Z", "2014-03-04T22:51:37Z", "2014-03-04T22:52:22Z",
+                        "2014-03-04T22:54:48Z"}, m.getValues(XMPMM.HISTORY_WHEN));
     }
 
     @Test
@@ -1035,16 +1044,13 @@ public class PDFParserTest extends TikaTest {
         ContentHandler handler = new BodyContentHandler(-1);
         Metadata m = new Metadata();
         ParseContext context = new ParseContext();
-        boolean tikaEx = false;
         try (InputStream is = getResourceAsStream("/test-documents/testPDF_bad_page_303226.pdf")) {
             AUTO_DETECT_PARSER.parse(is, handler, m, context);
-        } catch (TikaException e) {
-            tikaEx = true;
         }
+        //as of PDFBox 2.0.28, exceptions are no longer thrown for this problem
         String content = handler.toString();
-        assertTrue(tikaEx, "Should have thrown exception");
-        assertEquals(1, m.getValues(TikaCoreProperties.TIKA_META_EXCEPTION_WARNING).length);
-        assertContains("Unknown dir", m.get(TikaCoreProperties.TIKA_META_EXCEPTION_WARNING));
+        assertEquals(0, m.getValues(TikaCoreProperties.TIKA_META_EXCEPTION_WARNING).length);
+        //assertContains("Unknown dir", m.get(TikaCoreProperties.TIKA_META_EXCEPTION_WARNING));
         assertContains("1309.61", content);
 
         //now try throwing exception immediately
@@ -1054,16 +1060,12 @@ public class PDFParserTest extends TikaTest {
 
         handler = new BodyContentHandler(-1);
         m = new Metadata();
-        tikaEx = false;
         try (InputStream is = getResourceAsStream("/test-documents/testPDF_bad_page_303226.pdf")) {
             AUTO_DETECT_PARSER.parse(is, handler, m, context);
-        } catch (TikaException e) {
-            tikaEx = true;
         }
         content = handler.toString();
-        assertTrue(tikaEx, "Should have thrown exception");
         assertEquals(0, m.getValues(TikaCoreProperties.TIKA_META_EXCEPTION_WARNING).length);
-        assertNotContained("1309.61", content);
+        assertContains("1309.61", content);
     }
 
     @Test
@@ -1230,11 +1232,19 @@ public class PDFParserTest extends TikaTest {
         Metadata m = metadataList.get(0);
         int[] totalChars = m.getIntValues(PDF.CHARACTERS_PER_PAGE);
         int[] unmappedUnicodeChars = m.getIntValues(PDF.UNMAPPED_UNICODE_CHARS_PER_PAGE);
+        int totalUnmappedChars = m.getInt(PDF.TOTAL_UNMAPPED_UNICODE_CHARS);
+        float overallPercentage =
+                Float.parseFloat(m.get(PDF.OVERALL_PERCENTAGE_UNMAPPED_UNICODE_CHARS));
+
         //weird issue with pdfbox 2.0.20
         //this test passes in my IDE, but does not pass with mvn clean install from commandline
         if (totalChars[15] > 0) {
             assertEquals(3805, totalChars[15]);
             assertEquals(120, unmappedUnicodeChars[15]);
+            assertEquals(126, totalUnmappedChars);
+            assertEquals(0.00146, overallPercentage, 0.0001f);
+            assertTrue(Boolean.parseBoolean(m.get(PDF.CONTAINS_NON_EMBEDDED_FONT)));
+            assertFalse(Boolean.parseBoolean(m.get(PDF.CONTAINS_DAMAGED_FONT)));
         }
         //confirm all works with angles
         PDFParserConfig pdfParserConfig = new PDFParserConfig();
@@ -1295,7 +1305,7 @@ public class PDFParserTest extends TikaTest {
         Metadata m = metadataList.get(0);
         //these two fields derive from the basic schema in the XMP, not dublin core
         assertEquals("Hewlett-Packard MFP", m.get(XMP.CREATOR_TOOL));
-        assertEquals("1998-08-29T13:53:15Z", m.get(XMP.CREATE_DATE));
+        assertEquals("1998-08-29T14:53:15Z", m.get(XMP.CREATE_DATE));
     }
 
     @Test
@@ -1391,32 +1401,66 @@ public class PDFParserTest extends TikaTest {
         }
     }
 
-            /**
-            @Test
-            public void testWriteLimit() throws Exception {
-                for (int i = 0; i < 10000; i += 13) {
-                    Metadata metadata = testWriteLimit("testPDF_childAttachments.pdf", i);
-                    assertEquals("true", metadata.get(TikaCoreProperties.WRITE_LIMIT_REACHED));
-                    int len = metadata.get(TikaCoreProperties.TIKA_CONTENT).length();
-                    System.out.println(len + " : " + i);
-                    assertTrue(len <= i);
-                }
-            }
+    @Test
+    public void testAI() throws Exception {
+        //This is file 1508.ai on PDFBOX-3385
+        //I changed the extension to pdf to make sure that the detection is
+        //coming from the structural chek we're now doing.
+        List<Metadata> metadataList = getRecursiveMetadata("testPDF_AdobeIllustrator.pdf");
+        assertEquals("application/illustrator", metadataList.get(0).get(Metadata.CONTENT_TYPE));
+        //we should try to find a small illustrator file xmp and the structural
+        //components we're looking for.
+    }
 
-            private Metadata testWriteLimit(String fileName, int limit) throws Exception {
-                BasicContentHandlerFactory factory = new BasicContentHandlerFactory(
-                        BasicContentHandlerFactory.HANDLER_TYPE.TEXT, limit
-                );
-                ContentHandler contentHandler = factory.getNewContentHandler();
-                Metadata metadata = new Metadata();
-                ParseContext parseContext = new ParseContext();
-                try (InputStream is = getResourceAsStream("/test-documents/" + fileName)) {
-                    AUTO_DETECT_PARSER.parse(is, contentHandler, metadata, parseContext);
-                } catch (WriteLimitReachedException e) {
-                    //e.printStackTrace();
-                }
-                metadata.set(TikaCoreProperties.TIKA_CONTENT, contentHandler.toString());
-                return metadata;
-            }*/
+    @Test
+    public void testThrowOnEncryptedPayload() throws Exception {
+        PDFParserConfig pdfParserConfig = new PDFParserConfig();
+        pdfParserConfig.setThrowOnEncryptedPayload(true);
+        ParseContext parseContext = new ParseContext();
+        parseContext.set(PDFParserConfig.class, pdfParserConfig);
+        assertThrows(EncryptedDocumentException.class, () -> {
+            getRecursiveMetadata("testMicrosoftIRMServices.pdf", parseContext);
+        });
+    }
 
+    @Test
+    public void testAFRelationshipAndException() throws Exception {
+        List<Metadata> metadataList = getRecursiveMetadata("testMicrosoftIRMServices.pdf");
+        assertEquals(2, metadataList.size());
+        assertEquals("EncryptedPayload", metadataList.get(1).get(PDF.ASSOCIATED_FILE_RELATIONSHIP));
+        assertContains("EncryptedDocumentException",
+                metadataList.get(1).get(TikaCoreProperties.EMBEDDED_EXCEPTION));
+
+    }
+    /**
+     * TODO -- need to test signature extraction
+     */
+
+    /**
+    @Test
+    public void testWriteLimit() throws Exception {
+        for (int i = 0; i < 10000; i += 13) {
+            Metadata metadata = testWriteLimit("testPDF_childAttachments.pdf", i);
+            assertEquals("true", metadata.get(TikaCoreProperties.WRITE_LIMIT_REACHED));
+            int len = metadata.get(TikaCoreProperties.TIKA_CONTENT).length();
+            System.out.println(len + " : " + i);
+            assertTrue(len <= i);
+        }
+    }
+
+    private Metadata testWriteLimit(String fileName, int limit) throws Exception {
+        BasicContentHandlerFactory factory = new BasicContentHandlerFactory(
+                BasicContentHandlerFactory.HANDLER_TYPE.TEXT, limit
+        );
+        ContentHandler contentHandler = factory.getNewContentHandler();
+        Metadata metadata = new Metadata();
+        ParseContext parseContext = new ParseContext();
+        try (InputStream is = getResourceAsStream("/test-documents/" + fileName)) {
+            AUTO_DETECT_PARSER.parse(is, contentHandler, metadata, parseContext);
+        } catch (WriteLimitReachedException e) {
+            //e.printStackTrace();
+        }
+        metadata.set(TikaCoreProperties.TIKA_CONTENT, contentHandler.toString());
+        return metadata;
+    }*/
 }

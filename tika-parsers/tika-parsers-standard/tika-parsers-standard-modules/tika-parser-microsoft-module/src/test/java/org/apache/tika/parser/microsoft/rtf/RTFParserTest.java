@@ -312,6 +312,14 @@ public class RTFParserTest extends TikaTest {
     }
 
     @Test
+    public void testHyperLinkAndStyles() throws Exception {
+        String content = getXML("testRTFHyperlinkAndStyles.rtf").xml;
+        String needle = "<b><i>DIP</i>: " +
+                "<a href=\"..\\\\..\\\\SAUCES\\\\Dips\\\\Dip, Caesar.doc\">Dip, Caesar.doc</a></b>";
+        assertContains(needle, content);
+    }
+
+    @Test
     public void testIgnoredControlWord() throws Exception {
         assertContains("<p>The quick brown fox jumps over the lazy dog</p>",
                 getXML("testRTFIgnoredControlWord.rtf").xml);
@@ -384,7 +392,9 @@ public class RTFParserTest extends TikaTest {
         assertEquals("1", xml.metadata.get(Office.PAGE_COUNT));
         assertEquals("70", xml.metadata.get(Office.WORD_COUNT));
         assertEquals("401", xml.metadata.get(Office.CHARACTER_COUNT));
-        assertTrue(xml.metadata.get(TikaCoreProperties.CREATED).startsWith("2010-10-13T"));
+        //RTFParser's legacy behavior is to apply local timezone to dates/times.
+        //This needs to be flexible enough to pass in various time-zones TIKA-4043
+        assertTrue(xml.metadata.get(TikaCoreProperties.CREATED).startsWith("2010-10-"));
     }
 
     // TIKA-1192

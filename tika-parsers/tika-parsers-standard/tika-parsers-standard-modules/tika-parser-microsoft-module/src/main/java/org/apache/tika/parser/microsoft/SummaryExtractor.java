@@ -16,11 +16,11 @@
  */
 package org.apache.tika.parser.microsoft;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 import org.apache.poi.hpsf.CustomProperties;
@@ -53,10 +53,11 @@ import org.apache.tika.utils.StringUtils;
 public class SummaryExtractor {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractPOIFSExtractor.class);
 
-    private static final String SUMMARY_INFORMATION = SummaryInformation.DEFAULT_STREAM_NAME;
+    private static final String SUMMARY_INFORMATION =
+            SummaryInformation.DEFAULT_STREAM_NAME.toUpperCase(Locale.US);
 
     private static final String DOCUMENT_SUMMARY_INFORMATION =
-            DocumentSummaryInformation.DEFAULT_STREAM_NAME;
+            DocumentSummaryInformation.DEFAULT_STREAM_NAME.toUpperCase(Locale.US);
 
     private final Metadata metadata;
 
@@ -99,10 +100,19 @@ public class SummaryExtractor {
     private void parseSummaryEntryIfExists(DirectoryNode root, String entryName)
             throws IOException, TikaException {
         try {
-            if (!root.hasEntry(entryName)) {
+            DocumentEntry entry = null;
+
+            try {
+                entry = (DocumentEntry) OfficeParser.getUCEntry(root, entryName);
+            } catch (IllegalArgumentException e) {
+                //POI throws these if there is a key in the entries map
+                //but the entry is null
                 return;
             }
-            DocumentEntry entry = (DocumentEntry) root.getEntry(entryName);
+            if (entry == null) {
+                return;
+            }
+
             PropertySet properties = new PropertySet(new DocumentInputStream(entry));
             if (properties.isSummaryInformation()) {
                 parse(new SummaryInformation(properties));
@@ -110,8 +120,6 @@ public class SummaryExtractor {
             if (properties.isDocumentSummaryInformation()) {
                 parse(new DocumentSummaryInformation(properties));
             }
-        } catch (FileNotFoundException e) {
-            // entry does not exist, just skip it
         } catch (NoPropertySetStreamException e) {
             // no property stream, just skip it
         } catch (UnexpectedPropertySetTypeException e) {

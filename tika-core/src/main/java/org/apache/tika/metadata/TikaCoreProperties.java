@@ -50,8 +50,30 @@ public interface TikaCoreProperties {
      */
     String TIKA_META_PREFIX = "X-TIKA" + NAMESPACE_PREFIX_DELIMITER;
     Property EMBEDDED_DEPTH = Property.internalInteger(TIKA_META_PREFIX + "embedded_depth");
+
+    /**
+     * This tracks the embedded file paths based on the name of embedded files
+     * where available.  There is a small risk that there may be path collisions
+     * and that these paths may not be unique within a file.
+     *
+     * For a more robust path, see {@link TikaCoreProperties#EMBEDDED_ID_PATH}.
+     */
     Property EMBEDDED_RESOURCE_PATH =
             Property.internalText(TIKA_META_PREFIX + "embedded_resource_path");
+
+    /**
+     * This tracks the embedded file paths based on the embedded file's
+     * {@link TikaCoreProperties#EMBEDDED_ID}.
+     */
+    Property EMBEDDED_ID_PATH =
+            Property.internalText(TIKA_META_PREFIX + "embedded_id_path");
+
+    /**
+     * This is a 1-index counter for embedded files, used by the RecursiveParserWrapper
+     */
+    Property EMBEDDED_ID =
+            Property.internalInteger(TIKA_META_PREFIX + "embedded_id");
+
     Property PARSE_TIME_MILLIS = Property.internalText(TIKA_META_PREFIX + "parse_time_millis");
     /**
      * Simple class name of the content handler
@@ -269,6 +291,12 @@ public interface TikaCoreProperties {
      */
     Property RATING = XMP.RATING;
 
+    /**
+     * This is the number of images (as in a multi-frame gif) returned by
+     * Java's {@link javax.imageio.ImageReader#getNumImages(boolean)}.  See
+     * the javadocs for known limitations.
+     */
+    Property NUM_IMAGES = Property.internalInteger("imagereader:NumImages");
 
     // Comment and rating properties
     /**
@@ -284,7 +312,31 @@ public interface TikaCoreProperties {
             EmbeddedResourceType.THUMBNAIL.toString(), EmbeddedResourceType.RENDERING.toString());
     Property HAS_SIGNATURE = Property.internalBoolean("hasSignature");
 
+    Property SIGNATURE_NAME = Property.internalTextBag("signature:name");
+    Property SIGNATURE_DATE = Property.internalDateBag("signature:date");
+    Property SIGNATURE_LOCATION = Property.internalTextBag("signature:location");
+    Property SIGNATURE_REASON = Property.internalTextBag("signature:reason");
+    Property SIGNATURE_FILTER = Property.internalTextBag("signature:filter");
+    Property SIGNATURE_CONTACT_INFO = Property.internalTextBag("signature:contact-info");
 
+    //is the file encrypted
+    Property IS_ENCRYPTED = Property.internalBoolean(TIKA_META_PREFIX + "encrypted");
+
+    /**
+     * General metadata key for the count of non-final versions available within a file.  This
+     * was added initially to support generalizing incremental updates in PDF.
+     */
+    Property VERSION_COUNT = Property.externalInteger(TIKA_META_PREFIX + "versionCount");
+
+    /**
+     * General metadata key for the version number of a given file that contains
+     * earlier versions within it.  This number is 0-indexed for the earliest version.
+     * The latest version does not have this metadata value.  This was added initially
+     * to support generalizing incremental updates in PDF.
+     */
+    Property VERSION_NUMBER = Property.externalInteger(TIKA_META_PREFIX + "versionNumber");
+
+    Property PIPES_RESULT = Property.externalText(TIKA_META_PREFIX + "pipes_result");
     /**
      * A file might contain different types of embedded documents.
      * The most common is the ATTACHMENT.
@@ -298,6 +350,11 @@ public interface TikaCoreProperties {
      * javascript within PDFActions.  This would not include, e.g., an
      * .exe file embedded in a .zip file.
      * <p>
+     * A VERSION is an earlier version of the file as in incremental updates.
+     * The initial use case for this is incremental updates in PDFs, but
+     * it could be applied to other file formats as well where earlier versions
+     * are recoverable. See also {@link PDF#INCREMENTAL_UPDATE_NUMBER}
+     * <p>
      * Not all parsers have yet implemented this.
      */
     enum EmbeddedResourceType {
@@ -307,6 +364,8 @@ public interface TikaCoreProperties {
         METADATA, //e.g. xmp, xfa
         FONT,//embedded font files
         THUMBNAIL, //TODO: set this in parsers that handle thumbnails
-        RENDERING //if a file has been rendered
+        RENDERING, //if a file has been rendered
+        VERSION, //an earlier version of a file
+        ALTERNATE_FORMAT_CHUNK //OOXML inline alternate format chunk
     }
 }

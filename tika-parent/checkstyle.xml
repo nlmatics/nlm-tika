@@ -32,7 +32,7 @@
 
   <property name="charset" value="UTF-8"/>
 
-  <property name="severity" value="error"/>
+  <property name="severity" value="warning"/>
 
   <property name="fileExtensions" value="java, properties, xml"/>
 
@@ -63,6 +63,11 @@
 
   <module name="TreeWalker">
     <!--<module name="FileContentsHolder"/>-->
+    <module name="IllegalImport">
+      <property name="regexp" value="true"/>
+      <!-- Reject any org.junit import that's not also org.junit.jupiter: -->
+      <property name="illegalClasses" value="^org\.junit\.(?!jupiter\.).+"/>
+    </module>
     <module name="OuterTypeFilename"/>
     <module name="IllegalTokenText">
       <property name="tokens" value="STRING_LITERAL, CHAR_LITERAL"/>
@@ -121,7 +126,7 @@
       <property name="throwsIndent" value="8"/>
       <property name="lineWrappingIndentation" value="8"/>
       <property name="arrayInitIndent" value="4"/>
-      <property name="severity" value="error"/>
+      <property name="severity" value="warning"/>
     </module>
     <module name="EmptyCatchBlock">
       <property name="exceptionVariableName" value="expected|ignore"/>

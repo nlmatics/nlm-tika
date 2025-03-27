@@ -17,7 +17,6 @@
 package org.apache.tika.pipes.fetcher.http;
 
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -38,6 +37,7 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.http.ConnectionClosedException;
 import org.apache.http.Header;
 import org.apache.http.HttpConnection;
@@ -66,6 +66,7 @@ import org.apache.tika.io.TemporaryResources;
 import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.Property;
+import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.pipes.fetcher.AbstractFetcher;
 import org.apache.tika.pipes.fetcher.RangeFetcher;
 import org.apache.tika.utils.StringUtils;
@@ -228,7 +229,7 @@ public class HttpFetcher extends AbstractFetcher implements Initializable, Range
     private InputStream spool(InputStream content, Metadata metadata) throws IOException {
         long start = System.currentTimeMillis();
         TemporaryResources tmp = new TemporaryResources();
-        Path tmpFile = tmp.createTempFile();
+        Path tmpFile = tmp.createTempFile(metadata);
         if (maxSpoolSize < 0) {
             Files.copy(content, tmpFile, StandardCopyOption.REPLACE_EXISTING);
         } else {
@@ -285,6 +286,7 @@ public class HttpFetcher extends AbstractFetcher implements Initializable, Range
                 if (uri != null) {
                     URL u = uri.toURL();
                     metadata.set(HTTP_TARGET_URL, u.toString());
+                    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, u.getFile());
                 }
             } catch (MalformedURLException e) {
                 //swallow
@@ -302,7 +304,6 @@ public class HttpFetcher extends AbstractFetcher implements Initializable, Range
                         url);
             }
         }
-
     }
 
     private String responseToString(HttpResponse response) {
@@ -310,9 +311,9 @@ public class HttpFetcher extends AbstractFetcher implements Initializable, Range
             return "";
         }
         try (InputStream is = response.getEntity().getContent()) {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            UnsynchronizedByteArrayOutputStream bos = UnsynchronizedByteArrayOutputStream.builder().get();
             IOUtils.copyLarge(is, bos, 0, maxErrMsgSize);
-            return new String(bos.toByteArray(), StandardCharsets.UTF_8);
+            return bos.toString(StandardCharsets.UTF_8);
         } catch (IOException e) {
             LOG.warn("IOException trying to read error message", e);
             return "";

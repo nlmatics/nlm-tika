@@ -16,7 +16,7 @@
  */
 package org.apache.tika.parser.microsoft;
 
-import java.io.ByteArrayInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -25,12 +25,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
+import org.apache.commons.io.input.UnsynchronizedByteArrayInputStream;
 import org.apache.poi.hdgf.extractor.VisioTextExtractor;
 import org.apache.poi.hpbf.extractor.PublisherTextExtractor;
 import org.apache.poi.poifs.crypt.Decryptor;
@@ -59,6 +61,7 @@ import org.apache.tika.parser.microsoft.ooxml.OOXMLParser;
 import org.apache.tika.sax.BodyContentHandler;
 import org.apache.tika.sax.EmbeddedContentHandler;
 import org.apache.tika.sax.XHTMLContentHandler;
+import org.apache.tika.utils.StringUtils;
 
 /**
  * Defines a Microsoft document content extractor.
@@ -115,7 +118,7 @@ public class OfficeParser extends AbstractOfficeParser {
             if (embeddedDocumentExtractor.shouldParseEmbedded(m)) {
                 embeddedDocumentExtractor.parseEmbedded(
                         //pass in space character so that we don't trigger a zero-byte exception
-                        new ByteArrayInputStream(new byte[]{'\u0020'}), xhtml, m, true);
+                        new UnsynchronizedByteArrayInputStream(new byte[]{'\u0020'}), xhtml, m, true);
             }
             return;
         }
@@ -124,9 +127,12 @@ public class OfficeParser extends AbstractOfficeParser {
             m.set(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE,
                     TikaCoreProperties.EmbeddedResourceType.MACRO.toString());
             m.set(Metadata.CONTENT_TYPE, "text/x-vbasic");
+            if (!StringUtils.isBlank(e.getKey())) {
+                m.set(TikaCoreProperties.RESOURCE_NAME_KEY, e.getKey());
+            }
             if (embeddedDocumentExtractor.shouldParseEmbedded(m)) {
                 embeddedDocumentExtractor.parseEmbedded(
-                        new ByteArrayInputStream(e.getValue().getBytes(StandardCharsets.UTF_8)),
+                        new UnsynchronizedByteArrayInputStream(e.getValue().getBytes(StandardCharsets.UTF_8)),
                         xhtml, m, true);
             }
         }
@@ -149,6 +155,7 @@ public class OfficeParser extends AbstractOfficeParser {
         final DirectoryNode root;
         TikaInputStream tstream = TikaInputStream.cast(stream);
         POIFSFileSystem mustCloseFs = null;
+        boolean isDirectoryNode = false;
         try {
             if (tstream == null) {
                 mustCloseFs = new POIFSFileSystem(new CloseShieldInputStream(stream));
@@ -159,6 +166,7 @@ public class OfficeParser extends AbstractOfficeParser {
                     root = ((POIFSFileSystem) container).getRoot();
                 } else if (container instanceof DirectoryNode) {
                     root = (DirectoryNode) container;
+                    isDirectoryNode = true;
                 } else {
                     POIFSFileSystem fs = null;
                     if (tstream.hasFile()) {
@@ -181,8 +189,12 @@ public class OfficeParser extends AbstractOfficeParser {
 
                 //We might consider not bothering to check for macros in root,
                 //if we know we're processing ppt based on content-type identified in metadata
-                extractMacros(root.getFileSystem(), xhtml,
-                        EmbeddedDocumentUtil.getEmbeddedDocumentExtractor(context));
+                if (! isDirectoryNode) {
+                    // if the "root" is a directory node, we assume that the macros have already
+                    // been extracted from the parent's fileSystem -- TIKA-4116
+                    extractMacros(root.getFileSystem(), xhtml,
+                            EmbeddedDocumentUtil.getEmbeddedDocumentExtractor(context));
+                }
 
             }
         } finally {
@@ -240,10 +252,10 @@ public class OfficeParser extends AbstractOfficeParser {
                 extractor.parse(xhtml);
                 break;
             case ENCRYPTED:
-                EncryptionInfo info = new EncryptionInfo(root);
-                Decryptor d = Decryptor.getInstance(info);
 
                 try {
+                    EncryptionInfo info = new EncryptionInfo(root);
+                    Decryptor d = Decryptor.getInstance(info);
                     // By default, use the default Office Password
                     String password = Decryptor.DEFAULT_PASSWORD;
 
@@ -270,6 +282,10 @@ public class OfficeParser extends AbstractOfficeParser {
                                 metadata, context);
                     }
                 } catch (GeneralSecurityException ex) {
+                    throw new EncryptedDocumentException(ex);
+                } catch (FileNotFoundException ex) {
+                    //this can happen because POI may not support case-insensitive ole2 object
+                    //lookups
                     throw new EncryptedDocumentException(ex);
                 }
                 break;
@@ -349,6 +365,24 @@ public class OfficeParser extends AbstractOfficeParser {
         public MediaType getType() {
             return type;
         }
+    }
+
+    /**
+     * Looks for entry within root (non-recursive) that has an upper-cased
+     * name that equals ucTarget
+     * @param root
+     * @param ucTarget
+     * @return
+     */
+    public static Entry getUCEntry(DirectoryEntry root, String ucTarget) {
+        Iterator<Entry> it = root.getEntries();
+        while (it.hasNext()) {
+            Entry e = it.next();
+            if (e.getName().toUpperCase(Locale.US).equals(ucTarget)) {
+                return e;
+            }
+        }
+        return null;
     }
 
 }
