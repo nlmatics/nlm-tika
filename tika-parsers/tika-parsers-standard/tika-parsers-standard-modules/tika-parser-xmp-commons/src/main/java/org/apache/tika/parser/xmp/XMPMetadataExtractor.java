@@ -25,6 +25,7 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.xmpbox.XMPMetadata;
 import org.apache.xmpbox.schema.DublinCoreSchema;
 import org.apache.xmpbox.schema.XMPBasicSchema;
+import org.apache.xmpbox.type.BadFieldValueException;
 import org.apache.xmpbox.xml.DomXmpParser;
 
 import org.apache.tika.exception.TikaException;
@@ -79,11 +80,19 @@ public class XMPMetadataExtractor {
             return;
         }
         if (schemaDublinCore != null) {
-            addMetadata(metadata, DublinCore.TITLE, schemaDublinCore.getTitle());
-            addMetadata(metadata, DublinCore.FORMAT, schemaDublinCore.getFormat());
-            addMetadata(metadata, DublinCore.DESCRIPTION, schemaDublinCore.getDescription());
-            addMetadata(metadata, DublinCore.CREATOR, schemaDublinCore.getCreators());
-            addMetadata(metadata, DublinCore.SUBJECT, schemaDublinCore.getSubjects());
+            try {
+                addMetadata(metadata, DublinCore.TITLE, schemaDublinCore.getTitle());
+                addMetadata(metadata, DublinCore.FORMAT, schemaDublinCore.getFormat());
+                addMetadata(metadata, DublinCore.DESCRIPTION, schemaDublinCore.getDescription());
+                addMetadata(metadata, DublinCore.CREATOR, schemaDublinCore.getCreators());
+                addMetadata(metadata, DublinCore.SUBJECT, schemaDublinCore.getSubjects());
+                //TODO PDFBOX30 this segment no longer needed with 3.0
+                if (false != false)
+                    throw new BadFieldValueException("");
+            }
+            catch (BadFieldValueException ex) {
+                throw new IOException(ex);
+            }
         }
     }
 

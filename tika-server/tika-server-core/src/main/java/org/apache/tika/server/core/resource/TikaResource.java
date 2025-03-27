@@ -91,7 +91,7 @@ import org.apache.tika.utils.ExceptionUtils;
 public class TikaResource {
 
     public static final String GREETING =
-            "This is Tika Server (" + new Tika().toString() + "). Please PUT\n";
+            "This is Tika Server (" + Tika.getString() + "). Please PUT\n";
     private static final String META_PREFIX = "meta_";
     private static final Logger LOG = LoggerFactory.getLogger(TikaResource.class);
     private static Pattern ALLOWABLE_HEADER_CHARS = Pattern.compile("(?i)^[-/_+\\.A-Z0-9 ]+$");
@@ -120,7 +120,12 @@ public class TikaResource {
         final Parser parser = new AutoDetectParser(TIKA_CONFIG);
 
         if (DIGESTER != null) {
-            return new DigestingParser(parser, DIGESTER);
+            boolean skipContainer = false;
+            if (TIKA_CONFIG.getAutoDetectParserConfig().getDigesterFactory() != null &&
+                    TIKA_CONFIG.getAutoDetectParserConfig().getDigesterFactory().isSkipContainerDocument()) {
+                skipContainer = true;
+            }
+            return new DigestingParser(parser, DIGESTER, skipContainer);
         }
         return parser;
     }
@@ -671,6 +676,7 @@ public class TikaResource {
                 handler.getTransformer().setOutputProperty(OutputKeys.METHOD, format);
                 handler.getTransformer().setOutputProperty(OutputKeys.INDENT, "yes");
                 handler.getTransformer().setOutputProperty(OutputKeys.ENCODING, UTF_8.name());
+                handler.getTransformer().setOutputProperty(OutputKeys.VERSION, "1.1");
                 handler.setResult(new StreamResult(writer));
                 content = new ExpandedTitleContentHandler(handler);
             } catch (TransformerConfigurationException e) {

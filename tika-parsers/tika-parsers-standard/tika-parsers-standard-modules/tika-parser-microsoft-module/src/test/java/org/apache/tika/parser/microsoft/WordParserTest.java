@@ -18,6 +18,7 @@ package org.apache.tika.parser.microsoft;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -36,6 +37,7 @@ import org.xml.sax.ContentHandler;
 
 import org.apache.tika.TikaTest;
 import org.apache.tika.config.TikaConfig;
+import org.apache.tika.exception.EncryptedDocumentException;
 import org.apache.tika.metadata.DublinCore;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.Office;
@@ -43,6 +45,7 @@ import org.apache.tika.metadata.OfficeOpenXMLExtended;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.Parser;
 import org.apache.tika.sax.BodyContentHandler;
 
 public class WordParserTest extends TikaTest {
@@ -295,6 +298,14 @@ public class WordParserTest extends TikaTest {
         officeParserConfig.setIncludeHeadersAndFooters(false);
         parseContext.set(OfficeParserConfig.class, officeParserConfig);
         String xml = getXML("testWORD_various.doc", parseContext).xml;
+        assertNotContained("This is the header text.", xml);
+        assertNotContained("This is the footer text.", xml);
+
+        Parser configuredParser = null;
+        try (InputStream is = getResourceAsStream("tika-config-headers-footers.xml")) {
+            configuredParser = new AutoDetectParser(new TikaConfig(is));
+        }
+        xml = getXML("testWORD_various.doc", configuredParser).xml;
         assertNotContained("This is the header text.", xml);
         assertNotContained("This is the footer text.", xml);
     }
@@ -656,5 +667,13 @@ public class WordParserTest extends TikaTest {
         //TIKA-2459
         assertContains("Paragraph one", getXML(
                 "testWORD_specialControlCharacter1415.doc").xml);
+    }
+
+    @Test
+    public void testEncryptedDRM() throws Exception {
+        assertThrows(EncryptedDocumentException.class, () -> {
+            //test file from: https://bz.apache.org/bugzilla/show_bug.cgi?id=62848
+            getRecursiveMetadata("testWORD_protected_drm.doc");
+        });
     }
 }

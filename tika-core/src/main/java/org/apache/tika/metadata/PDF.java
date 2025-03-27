@@ -27,6 +27,17 @@ public interface PDF {
     String PDFA_PREFIX = "pdfa" + TikaCoreProperties.NAMESPACE_PREFIX_DELIMITER;
     String PDFAID_PREFIX = "pdfaid" + TikaCoreProperties.NAMESPACE_PREFIX_DELIMITER;
 
+
+    /**
+     * Number of %%EOF as extracted by the StartXRefScanner. See
+     * that class for limitations.
+     *
+     * This includes the final %%EOF, which may or may not be at the literal
+     * end of the file.  This does not include an %%EOF
+     * if the startxref=0, as would happen in a dummy %%EOF in a linearized PDF.
+     */
+    Property EOF_OFFSETS = Property.externalRealSeq(PDF_PREFIX + "eofOffsets");
+
     /**
      * Prefix to be used for properties that record what was stored
      * in the docinfo section (as opposed to XMP)
@@ -57,11 +68,24 @@ public interface PDF {
 
     Property PDF_VERSION = Property.internalRational(PDF_PREFIX + "PDFVersion");
     Property PDFA_VERSION = Property.internalRational(PDFA_PREFIX + "PDFVersion");
+
     Property PDF_EXTENSION_VERSION = Property.internalRational(PDF_PREFIX + "PDFExtensionVersion");
 
     Property PDFAID_CONFORMANCE = Property.internalText(PDFAID_PREFIX + "conformance");
 
-    Property PDFAID_PART = Property.internalText(PDFAID_PREFIX + "part");
+    Property PDFAID_PART = Property.internalInteger(PDFAID_PREFIX + "part");
+
+    Property PDFUAID_PART = Property.internalInteger("pdfuaid:part");
+
+    Property PDFVT_VERSION = Property.internalText("pdfvt:version");
+
+    Property PDFVT_MODIFIED = Property.internalDate("pdfvt:modified");
+    Property PDFXID_VERSION = Property.internalText("pdfxid:version");
+
+    Property PDFX_VERSION = Property.internalText("pdfx:version");
+
+    Property PDFX_CONFORMANCE = Property.internalText("pdfx:conformance");
+    Property ILLUSTRATOR_TYPE = Property.internalText("pdf:illustrator:type");
 
     Property IS_ENCRYPTED = Property.internalBoolean(PDF_PREFIX + "encrypted");
 
@@ -70,13 +94,41 @@ public interface PDF {
     /**
      * This specifies where an action or destination would be found/triggered
      * in the document: on document open, before close, etc.
+     *
+     * This is included in the embedded document (js only for now?), not the container PDF.
      */
     Property ACTION_TRIGGER = Property.internalText(PDF_PREFIX + "actionTrigger");
+
+    /**
+     * This is a list of all action or destination triggers contained
+     * within a given PDF.
+     */
+    Property ACTION_TRIGGERS = Property.internalTextBag(PDF_PREFIX + "actionTriggers");
+
+    Property ACTION_TYPES = Property.internalTextBag(PDF_PREFIX + "actionTypes");
 
     Property CHARACTERS_PER_PAGE = Property.internalIntegerSequence(PDF_PREFIX + "charsPerPage");
 
     Property UNMAPPED_UNICODE_CHARS_PER_PAGE =
             Property.internalIntegerSequence(PDF_PREFIX + "unmappedUnicodeCharsPerPage");
+
+    Property TOTAL_UNMAPPED_UNICODE_CHARS =
+            Property.internalInteger(PDF_PREFIX + "totalUnmappedUnicodeChars");
+
+    Property OVERALL_PERCENTAGE_UNMAPPED_UNICODE_CHARS =
+            Property.internalReal(PDF_PREFIX + "overallPercentageUnmappedUnicodeChars");
+
+    /**
+     * Contains at least one damaged font for at least one character
+     */
+    Property CONTAINS_DAMAGED_FONT =
+            Property.internalBoolean(PDF_PREFIX + "containsDamagedFont");
+
+    /**
+     * Contains at least one font that is not embedded
+     */
+    Property CONTAINS_NON_EMBEDDED_FONT =
+            Property.internalBoolean(PDF_PREFIX + "containsNonEmbeddedFont");
 
     /**
      * Has XFA
@@ -110,6 +162,18 @@ public interface PDF {
             "embeddedFileDescription");
 
     /**
+     * If the file came from an annotation and there was a type
+     */
+    Property EMBEDDED_FILE_ANNOTATION_TYPE = Property.internalText(PDF_PREFIX +
+            "embeddedFileAnnotationType");
+
+    /**
+     *     literal string from the PDEmbeddedFile#getSubtype(), should be what the PDF
+     *     alleges is the embedded file's mime type
+     */
+    Property EMBEDDED_FILE_SUBTYPE = Property.internalText(PDF_PREFIX +
+            "embeddedFileSubtype");
+    /**
      * If the PDF has an annotation of type 3D
      */
     Property HAS_3D = Property.internalBoolean(PDF_PREFIX + "has3D");
@@ -117,4 +181,32 @@ public interface PDF {
     Property ANNOTATION_TYPES = Property.internalTextBag(PDF_PREFIX + "annotationTypes");
 
     Property ANNOTATION_SUBTYPES = Property.internalTextBag(PDF_PREFIX + "annotationSubtypes");
+
+    /**
+     * Number of 3D annotations a PDF contains.  This makes {@link PDF#HAS_3D} redundant.
+     */
+    Property NUM_3D_ANNOTATIONS = Property.internalInteger(PDF_PREFIX + "num3DAnnotations");
+
+    Property ASSOCIATED_FILE_RELATIONSHIP = Property.internalText(PDF_PREFIX +
+            "associatedFileRelationship");
+    /**
+     * This is a zero-based number for incremental updates within a PDF -- 0 is the first
+     * update, 1 is the second, etc.  The final version of the PDF (e.g. the last update)
+     * does not have an incremental update number.
+     *
+     * This value is populated with the parse incremental updates feature is selected
+     * in the PDFParser.
+     */
+    Property INCREMENTAL_UPDATE_NUMBER =
+            Property.composite(Property.internalInteger(PDF_PREFIX + "incrementalUpdateNumber"),
+                new Property[]{ TikaCoreProperties.VERSION_NUMBER });
+
+    /**
+     * Incremental updates as extracted by the StartXRefScanner.  See
+     * that class for limitations.
+     */
+    Property PDF_INCREMENTAL_UPDATE_COUNT =
+            Property.composite( Property.externalInteger(PDF_PREFIX + "incrementalUpdateCount"),
+                    new Property[]{ TikaCoreProperties.VERSION_COUNT });
+
 }

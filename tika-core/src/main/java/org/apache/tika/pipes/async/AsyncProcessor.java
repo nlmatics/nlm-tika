@@ -37,10 +37,13 @@ import org.apache.tika.exception.TikaException;
 import org.apache.tika.pipes.FetchEmitTuple;
 import org.apache.tika.pipes.PipesClient;
 import org.apache.tika.pipes.PipesException;
+import org.apache.tika.pipes.PipesReporter;
 import org.apache.tika.pipes.PipesResult;
 import org.apache.tika.pipes.emitter.EmitData;
 import org.apache.tika.pipes.emitter.EmitterManager;
 import org.apache.tika.pipes.pipesiterator.PipesIterator;
+import org.apache.tika.pipes.pipesiterator.TotalCountResult;
+import org.apache.tika.pipes.pipesiterator.TotalCounter;
 
 /**
  * This is the main class for handling async requests. This manages
@@ -67,43 +70,79 @@ public class AsyncProcessor implements Closeable {
     boolean isShuttingDown = false;
 
     public AsyncProcessor(Path tikaConfigPath) throws TikaException, IOException {
+        this(tikaConfigPath, null);
+    }
+
+    public AsyncProcessor(Path tikaConfigPath, PipesIterator pipesIterator) throws TikaException, IOException {
         this.asyncConfig = AsyncConfig.load(tikaConfigPath);
         this.fetchEmitTuples = new ArrayBlockingQueue<>(asyncConfig.getQueueSize());
         this.emitData = new ArrayBlockingQueue<>(100);
+        //+1 is the watcher thread
         this.executorService = Executors.newFixedThreadPool(
                 asyncConfig.getNumClients() + asyncConfig.getNumEmitters() + 1);
         this.executorCompletionService =
                 new ExecutorCompletionService<>(executorService);
-        if (!tikaConfigPath.toAbsolutePath()
-                .equals(asyncConfig.getTikaConfig().toAbsolutePath())) {
-            LOG.warn("TikaConfig for AsyncProcessor ({}) is different " +
-                    "from TikaConfig for workers ({}). If this is intended," +
-                    " please ignore this warning.",
-                    tikaConfigPath.toAbsolutePath(),
-                    asyncConfig.getTikaConfig().toAbsolutePath()
-            );
+        try {
+            if (!tikaConfigPath.toAbsolutePath().equals(asyncConfig.getTikaConfig().toAbsolutePath())) {
+                LOG.warn("TikaConfig for AsyncProcessor ({}) is different " +
+                                "from TikaConfig for workers ({}). If this is intended," +
+                                " please ignore this warning.", tikaConfigPath.toAbsolutePath(),
+                        asyncConfig.getTikaConfig().toAbsolutePath());
+            }
+            this.executorCompletionService.submit(() -> {
+                while (true) {
+                    try {
+                        Thread.sleep(500);
+                        checkActive();
+                    } catch (InterruptedException e) {
+                        return WATCHER_FUTURE_CODE;
+                    }
+                }
+            });
+            //this is run in a daemon thread
+            if (pipesIterator != null && (pipesIterator instanceof TotalCounter)) {
+                LOG.debug("going to total counts");
+                startCounter((TotalCounter) pipesIterator);
+            }
+
+            for (int i = 0; i < asyncConfig.getNumClients(); i++) {
+                executorCompletionService.submit(
+                        new FetchEmitWorker(asyncConfig, fetchEmitTuples, emitData));
+            }
+
+            EmitterManager emitterManager = EmitterManager.load(asyncConfig.getTikaConfig());
+            for (int i = 0; i < asyncConfig.getNumEmitters(); i++) {
+                executorCompletionService.submit(
+                        new AsyncEmitter(asyncConfig, emitData, emitterManager));
+            }
+        } catch (Exception e) {
+            LOG.error("problem initializing AsyncProcessor", e);
+            executorService.shutdownNow();
+            asyncConfig.getPipesReporter().error(e);
+            throw e;
         }
-        this.executorCompletionService.submit(() -> {
-            while (true) {
+    }
+
+    private void startCounter(TotalCounter totalCounter) {
+        Thread counterThread = new Thread(() -> {
+            totalCounter.startTotalCount();
+            PipesReporter pipesReporter = asyncConfig.getPipesReporter();
+            TotalCountResult.STATUS status = totalCounter.getTotalCount().getStatus();
+            while (status == TotalCountResult.STATUS.NOT_COMPLETED) {
                 try {
                     Thread.sleep(500);
-                    checkActive();
+                    TotalCountResult result = totalCounter.getTotalCount();
+                    LOG.trace("counter total  {} {} ", result.getStatus(), result.getTotalCount());
+                    pipesReporter.report(result);
+                    status = result.getStatus();
                 } catch (InterruptedException e) {
-                    return WATCHER_FUTURE_CODE;
+                    return;
                 }
             }
+
         });
-
-        for (int i = 0; i < asyncConfig.getNumClients(); i++) {
-            executorCompletionService.submit(new FetchEmitWorker(asyncConfig, fetchEmitTuples,
-                    emitData));
-        }
-
-        EmitterManager emitterManager = EmitterManager.load(asyncConfig.getTikaConfig());
-        for (int i = 0; i < asyncConfig.getNumEmitters(); i++) {
-            executorCompletionService.submit(new AsyncEmitter(asyncConfig, emitData,
-                    emitterManager));
-        }
+        counterThread.setDaemon(true);
+        counterThread.start();
     }
 
     public synchronized boolean offer(List<FetchEmitTuple> newFetchEmitTuples, long offerMs)
@@ -185,6 +224,7 @@ public class AsyncProcessor implements Closeable {
                 }
             } catch (ExecutionException e) {
                 LOG.error("execution exception", e);
+                asyncConfig.getPipesReporter().error(e);
                 throw new RuntimeException(e);
             }
         }
@@ -254,6 +294,7 @@ public class AsyncProcessor implements Closeable {
                         try {
                             result = pipesClient.process(t);
                         } catch (IOException e) {
+                            LOG.warn("pipesClient crash", e);
                             result = PipesResult.UNSPECIFIED_CRASH;
                         }
                         if (LOG.isTraceEnabled()) {
@@ -261,8 +302,9 @@ public class AsyncProcessor implements Closeable {
                                     System.currentTimeMillis() - start);
                         }
                         long offerStart = System.currentTimeMillis();
-                        if (result.getStatus() == PipesResult.STATUS.PARSE_SUCCESS ||
-                                result.getStatus() == PipesResult.STATUS.PARSE_SUCCESS_WITH_EXCEPTION) {
+
+                        if (shouldEmit(result)) {
+                            LOG.trace("adding result to emitter queue: " + result.getEmitData());
                             boolean offered = emitDataQueue.offer(result.getEmitData(),
                                     MAX_OFFER_WAIT_MS,
                                     TimeUnit.MILLISECONDS);
@@ -282,6 +324,14 @@ public class AsyncProcessor implements Closeable {
                 }
             }
         }
-    }
 
+        private boolean shouldEmit(PipesResult result) {
+
+            if (result.getStatus() == PipesResult.STATUS.PARSE_SUCCESS ||
+                    result.getStatus() == PipesResult.STATUS.PARSE_SUCCESS_WITH_EXCEPTION) {
+                return true;
+            }
+            return result.isIntermediate() && asyncConfig.isEmitIntermediateResults();
+        }
+    }
 }

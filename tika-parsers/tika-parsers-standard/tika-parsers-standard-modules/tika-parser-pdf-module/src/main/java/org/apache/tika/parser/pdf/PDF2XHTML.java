@@ -91,7 +91,6 @@ class PDF2XHTML extends AbstractPDF2XHTML {
     private AtomicInteger inlineImageCounter = new AtomicInteger(0);
     private Map<TextPosition, List<String>> textColors = new HashMap<>();
 
-
     PDF2XHTML(PDDocument document, ContentHandler handler, ParseContext context, Metadata metadata,
               PDFParserConfig config) throws IOException {
         super(document, handler, context, metadata, config);
@@ -475,14 +474,6 @@ class PDF2XHTML extends AbstractPDF2XHTML {
             result.add(Arrays.asList(spanText, val));
         }
         return result;
-    }
-    @Override
-    protected void processTextPosition(TextPosition text) {
-        PDGraphicsState graphicsState = getGraphicsState();
-        PDColor bgColor = graphicsState.getNonStrokingColor();
-        PDColor color = graphicsState.getStrokingColor();
-        this.textColors.put(text, Arrays.asList(bgColor.toString(), color.toString()));
-        super.processTextPosition(text);
     }
 
     @Override

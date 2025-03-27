@@ -86,6 +86,8 @@ public class CompressorParser extends AbstractParser {
     private static Set<MediaType> SUPPORTED_TYPES;
     private static Map<String, String> MIMES_TO_NAME;
 
+    private boolean decompressConcatenated = false;
+
     static {
         Set<MediaType> TMP_SET = new HashSet<>(MediaType
                 .set(BZIP, BZIP2, DEFLATE64, GZIP, GZIP_ALT, LZ4_FRAMED, COMPRESS, XZ, PACK,
@@ -168,16 +170,16 @@ public class CompressorParser extends AbstractParser {
         // any associated resources, but the underlying document stream
         // should not be closed
         if (stream.markSupported()) {
-            stream = new CloseShieldInputStream(stream);
+            stream = CloseShieldInputStream.wrap(stream);
         } else {
             // Ensure that the stream supports the mark feature
-            stream = new BufferedInputStream(new CloseShieldInputStream(stream));
+            stream = new BufferedInputStream(CloseShieldInputStream.wrap(stream));
         }
 
         CompressorInputStream cis;
         try {
             CompressorParserOptions options =
-                    context.get(CompressorParserOptions.class, metadata1 -> false);
+                    context.get(CompressorParserOptions.class, metadata1 -> decompressConcatenated);
             CompressorStreamFactory factory =
                     new CompressorStreamFactory(options.decompressConcatenated(metadata),
                             memoryLimitInKb);
@@ -250,6 +252,19 @@ public class CompressorParser extends AbstractParser {
     @Field
     public void setMemoryLimitInKb(int memoryLimitInKb) {
         this.memoryLimitInKb = memoryLimitInKb;
+    }
+
+    public int getMemoryLimitInKb() {
+        return this.memoryLimitInKb;
+    }
+
+    @Field
+    public void setDecompressConcatenated(boolean decompressConcatenated) {
+        this.decompressConcatenated = decompressConcatenated;
+    }
+
+    public boolean isDecompressConcatenated() {
+        return this.decompressConcatenated;
     }
 
 }

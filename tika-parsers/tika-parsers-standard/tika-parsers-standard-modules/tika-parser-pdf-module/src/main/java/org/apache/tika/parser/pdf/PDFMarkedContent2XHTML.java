@@ -37,6 +37,7 @@ import org.apache.pdfbox.cos.COSObject;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageTree;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDObjectReference;
 import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureTreeRoot;
 import org.apache.pdfbox.pdmodel.documentinterchange.markedcontent.PDMarkedContent;
 import org.apache.pdfbox.text.PDFMarkedContentExtractor;
@@ -100,7 +101,9 @@ public class PDFMarkedContent2XHTML extends PDF2XHTML {
      *
      * @param pdDocument PDF document
      * @param handler    SAX content handler
+     * @param context
      * @param metadata   PDF metadata
+     * @param config
      * @throws SAXException  if the content handler fails to process SAX events
      * @throws TikaException if there was an exception outside of per page processing
      */
@@ -273,27 +276,30 @@ public class PDFMarkedContent2XHTML extends PDF2XHTML {
             for (COSBase k : ((COSArray) kids)) {
                 recurse(k, currentPageRef, depth, paragraphs, roleMap);
             }
-        } else if (kids instanceof COSObject) {
-            COSBase cosType = ((COSObject) kids).getItem(COSName.TYPE);
-            if (cosType != null && cosType instanceof COSName) {
-                if ("OBJR".equals(((COSName) cosType).getName())) {
-                    recurse(((COSObject) kids).getDictionaryObject(COSName.OBJ), currentPageRef,
-                            depth + 1, paragraphs, roleMap);
-                }
+        } else if (kids instanceof COSObject && 
+                ((COSObject) kids).getObject() instanceof COSDictionary) {
+            //TODO should be merged with COSDictionary segment below?
+            // and maybe dereference COSObject first, i.e. before the first "if"?
+            COSDictionary dict = (COSDictionary) ((COSObject) kids).getObject();
+            COSName type = dict.getCOSName(COSName.TYPE);
+            if (COSName.getPDFName(PDObjectReference.TYPE).equals(type)) // OBJR
+            {
+                recurse(dict.getDictionaryObject(COSName.OBJ), currentPageRef,depth + 1, paragraphs,
+                        roleMap);
             }
 
-            COSBase n = ((COSObject) kids).getItem(COSName.S);
+            COSBase n = dict.getItem(COSName.S);
             String name = "";
             if (n instanceof COSName) {
                 name = ((COSName) n).getName();
             }
-            COSBase grandkids = ((COSObject) kids).getItem(COSName.K);
+            COSBase grandkids = dict.getItem(COSName.K);
             if (grandkids == null) {
                 return;
             }
-            COSBase pageBase = ((COSObject) kids).getItem(COSName.PG);
+            COSBase pageBase = dict.getItem(COSName.PG);
 
-            if (pageBase != null && pageBase instanceof COSObject) {
+            if (pageBase instanceof COSObject) {
                 currentPageRef = new ObjectRef(((COSObject) pageBase).getObjectNumber(),
                         ((COSObject) pageBase).getGenerationNumber());
             }
@@ -362,7 +368,6 @@ public class PDFMarkedContent2XHTML extends PDF2XHTML {
                 } else if (dict.containsKey(COSName.OBJ)) {
                     recurse(dict.getDictionaryObject(COSName.OBJ), currentPageRef, depth + 1,
                             paragraphs, roleMap);
-
                 }
             }
         } else {

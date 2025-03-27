@@ -18,13 +18,11 @@ package org.apache.tika.parser.microsoft;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -36,6 +34,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.input.UnsynchronizedByteArrayInputStream;
 import org.apache.james.mime4j.codec.DecodeMonitor;
 import org.apache.james.mime4j.codec.DecoderUtil;
 import org.apache.poi.hmef.attribute.MAPIRtfAttribute;
@@ -257,10 +256,12 @@ public class OutlookExtractor extends AbstractPOIFSExtractor {
 
                             // See if we can parse it as a normal mail date
                             try {
-                                Date d = MailDateParser.parseDate(date);
+                                Date d = MailDateParser.parseDateLenient(date);
                                 metadata.set(TikaCoreProperties.CREATED, d);
                                 metadata.set(TikaCoreProperties.MODIFIED, d);
-                            } catch (ParseException e) {
+                            } catch (SecurityException e ) {
+                                throw e;
+                            } catch (Exception e) {
                                 // Store it as-is, and hope for the best...
                                 metadata.set(TikaCoreProperties.CREATED, date);
                                 metadata.set(TikaCoreProperties.MODIFIED, date);
@@ -370,7 +371,7 @@ public class OutlookExtractor extends AbstractPOIFSExtractor {
                 if (htmlParser == null) {
                     htmlParser = new HtmlParser();
                 }
-                htmlParser.parse(new ByteArrayInputStream(data),
+                htmlParser.parse(new UnsynchronizedByteArrayInputStream(data),
                         new EmbeddedContentHandler(new BodyContentHandler(xhtml)), new Metadata(),
                         parseContext);
                 doneBody = true;
@@ -390,7 +391,7 @@ public class OutlookExtractor extends AbstractPOIFSExtractor {
                 if (rtfParser == null) {
                     rtfParser = new RTFParser();
                 }
-                rtfParser.parse(new ByteArrayInputStream(rtf.getData()),
+                rtfParser.parse(new UnsynchronizedByteArrayInputStream(rtf.getData()),
                         new EmbeddedContentHandler(new BodyContentHandler(xhtml)), new Metadata(),
                         parseContext);
                 doneBody = true;
@@ -650,7 +651,7 @@ public class OutlookExtractor extends AbstractPOIFSExtractor {
             if (html != null && html.length() > 0) {
                 Charset charset = null;
                 try {
-                    charset = detector.detect(new ByteArrayInputStream(html.getBytes(UTF_8)),
+                    charset = detector.detect(new UnsynchronizedByteArrayInputStream(html.getBytes(UTF_8)),
                             EMPTY_METADATA);
                 } catch (IOException e) {
                     //swallow

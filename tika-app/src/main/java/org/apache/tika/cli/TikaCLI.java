@@ -66,6 +66,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import org.apache.tika.Tika;
+import org.apache.tika.async.cli.TikaAsyncCLI;
 import org.apache.tika.batch.BatchProcessDriverCLI;
 import org.apache.tika.config.TikaConfig;
 import org.apache.tika.config.TikaConfigSerializer;
@@ -99,10 +100,6 @@ import org.apache.tika.parser.PasswordProvider;
 import org.apache.tika.parser.RecursiveParserWrapper;
 import org.apache.tika.parser.digestutils.CommonsDigester;
 import org.apache.tika.parser.pdf.PDFParserConfig;
-import org.apache.tika.pipes.FetchEmitTuple;
-import org.apache.tika.pipes.PipesException;
-import org.apache.tika.pipes.async.AsyncProcessor;
-import org.apache.tika.pipes.pipesiterator.PipesIterator;
 import org.apache.tika.sax.BasicContentHandlerFactory;
 import org.apache.tika.sax.BodyContentHandler;
 import org.apache.tika.sax.ContentHandlerFactory;
@@ -277,31 +274,15 @@ public class TikaCLI {
     }
 
     private static void async(String[] args)
-            throws InterruptedException, PipesException, TikaException, IOException, SAXException {
+            throws Exception {
         String tikaConfigPath = "";
+        String config = "--config=";
         for (String arg : args) {
-            if (arg.startsWith("--config=")) {
-                tikaConfigPath = arg.substring(9);
+            if (arg.startsWith(config)) {
+                tikaConfigPath = arg.substring(config.length());
             }
         }
-        PipesIterator pipesIterator = PipesIterator.build(Paths.get(tikaConfigPath));
-        long start = System.currentTimeMillis();
-        try (AsyncProcessor processor = new AsyncProcessor(Paths.get(tikaConfigPath))) {
-            for (FetchEmitTuple t : pipesIterator) {
-                processor.offer(t, 2000);
-            }
-            processor.finished();
-            while (true) {
-                if (processor.checkActive()) {
-                    Thread.sleep(500);
-                } else {
-                    break;
-                }
-            }
-            long elapsed = System.currentTimeMillis() - start;
-            LOG.info("Successfully finished processing {} files in {} ms",
-                    processor.getTotalProcessed(), elapsed);
-        }
+        TikaAsyncCLI.main(new String[]{ tikaConfigPath});
     }
 
     /**
@@ -359,12 +340,14 @@ public class TikaCLI {
         return false;
     }
 
-    private void extractInlineImagesFromPDFs() {
+    private void configurePDFExtractSettings() {
         if (configFilePath == null && context.get(PDFParserConfig.class) == null) {
             PDFParserConfig pdfParserConfig = new PDFParserConfig();
             pdfParserConfig.setExtractInlineImages(true);
+            pdfParserConfig.setParseIncrementalUpdates(true);
             String warn = "As a convenience, TikaCLI has turned on extraction of\n" +
-                    "inline images for the PDFParser (TIKA-2374).\n" +
+                    "inline images and incremental updates for the PDFParser (TIKA-2374 and " +
+                    "TIKA-4017).\n" +
                     "Aside from the -z option, this is not the default behavior\n" +
                     "in Tika generally or in tika-server.";
             LOG.info(warn);
@@ -471,7 +454,7 @@ public class TikaCLI {
             }
             extractDir = new File(dirPath);
         } else if (arg.equals("-z") || arg.equals("--extract")) {
-            extractInlineImagesFromPDFs();
+            configurePDFExtractSettings();
             type = NO_OUTPUT;
             context.set(EmbeddedDocumentExtractor.class, new FileEmbeddedDocumentExtractor());
         } else if (arg.equals("-r") || arg.equals("--pretty-print")) {
@@ -674,7 +657,7 @@ public class TikaCLI {
     }
 
     private void version() {
-        System.out.println(new Tika().toString());
+        System.out.println(Tika.getString());
     }
 
     private boolean testForHelp(String[] args) {
@@ -717,7 +700,9 @@ public class TikaCLI {
 
             parser = new AutoDetectParser(config);
             if (digester != null) {
-                parser = new DigestingParser(parser, digester);
+                parser = new DigestingParser(parser, digester, false);
+                LOG.info("As of Tika 2.5.0, you can set the digester via the AutoDetectParserConfig in " +
+                        "tika-config.xml. We plan to remove this commandline option in 2.8.0");
             }
         }
         detector = config.getDetector();

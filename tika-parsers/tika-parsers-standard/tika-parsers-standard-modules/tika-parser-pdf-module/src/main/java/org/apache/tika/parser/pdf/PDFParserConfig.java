@@ -142,6 +142,14 @@ public class PDFParserConfig implements Serializable {
 
     private Renderer renderer;
 
+    private boolean extractIncrementalUpdateInfo = false;
+
+    private boolean parseIncrementalUpdates = false;
+
+    int maxIncrementalUpdates = 10;
+
+    private boolean throwOnEncryptedPayload = false;
+
     /**
      * @return whether or not to extract only inline image metadata and not render the images
      */
@@ -637,7 +645,7 @@ public class PDFParserConfig implements Serializable {
      * @see #setOcrImageType(ImageType)
      */
     public void setOcrImageType(String ocrImageTypeString) {
-        this.ocrImageType = parseImageType(ocrImageTypeString);
+        setOcrImageType(parseImageType(ocrImageTypeString));
     }
 
     /**
@@ -886,7 +894,46 @@ public class PDFParserConfig implements Serializable {
         return imageStrategy;
     }
 
+    public boolean isExtractIncrementalUpdateInfo() {
+        return extractIncrementalUpdateInfo;
+    }
 
+    public void setExtractIncrementalUpdateInfo(boolean extractIncrementalUpdateInfo) {
+        this.extractIncrementalUpdateInfo = extractIncrementalUpdateInfo;
+        userConfigured.add("extractIncrementalUpdateInfo");
+    }
+
+    public boolean isParseIncrementalUpdates() {
+        return parseIncrementalUpdates;
+    }
+
+    public void setParseIncrementalUpdates(boolean parseIncrementalUpdates) {
+        this.parseIncrementalUpdates = parseIncrementalUpdates;
+        userConfigured.add("parseIncrementalUpdates");
+    }
+
+    public int getMaxIncrementalUpdates() {
+        return maxIncrementalUpdates;
+    }
+
+    /**
+     * The maximum number of incremental updates to parse.
+     *
+     * @param maxIncrementalUpdates
+     */
+    public void setMaxIncrementalUpdates(int maxIncrementalUpdates) {
+        this.maxIncrementalUpdates = maxIncrementalUpdates;
+        userConfigured.add("maxIncrementalUpdates");
+    }
+
+    public void setThrowOnEncryptedPayload(boolean throwOnEncryptedPayload) {
+        this.throwOnEncryptedPayload = throwOnEncryptedPayload;
+        userConfigured.add("throwOnEncryptedPayload");
+    }
+
+    public boolean isThrowOnEncryptedPayload() {
+        return throwOnEncryptedPayload;
+    }
 
     public enum OCR_STRATEGY {
         AUTO, NO_OCR, OCR_ONLY, OCR_AND_TEXT_EXTRACTION;
@@ -945,6 +992,20 @@ public class PDFParserConfig implements Serializable {
 
         public int getTotalCharsPerPage() {
             return totalCharsPerPage;
+        }
+
+        @Override
+        public String toString() {
+            //TODO -- figure out if this is actual BEST or whatever
+            //and return that instead of the literal values
+            String unmappedString = null;
+            if (unmappedUnicodeCharsPerPage < 1.0) {
+                unmappedString = String.format(Locale.US, "%.03f",
+                        unmappedUnicodeCharsPerPage * 100) + "%";
+            } else {
+                unmappedString = String.format(Locale.US, "%.0f", unmappedUnicodeCharsPerPage);
+            }
+            return unmappedString + "," + totalCharsPerPage;
         }
     }
 

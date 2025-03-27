@@ -16,8 +16,6 @@
  */
 package org.apache.tika.pipes;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -31,18 +29,26 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.UnsynchronizedByteArrayInputStream;
+import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
 import org.apache.tika.config.TikaConfig;
+import org.apache.tika.detect.Detector;
 import org.apache.tika.exception.EncryptedDocumentException;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.extractor.DocumentSelector;
+import org.apache.tika.io.TemporaryResources;
+import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
+import org.apache.tika.mime.MediaType;
 import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.DigestingParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
 import org.apache.tika.parser.RecursiveParserWrapper;
@@ -76,6 +82,9 @@ public class PipesServer implements Runnable {
     //this has to be some number not close to 0-3
     //it looks like the server crashes with exit value 3 on OOM, for example
     public static final int TIMEOUT_EXIT_CODE = 17;
+    private DigestingParser.Digester digester;
+
+    private Detector detector;
 
     public enum STATUS {
         READY,
@@ -93,7 +102,8 @@ public class PipesServer implements Runnable {
         EMIT_EXCEPTION,
         OOM,
         TIMEOUT,
-        EMPTY_OUTPUT;
+        EMPTY_OUTPUT,
+        INTERMEDIATE_RESULT;
 
         byte getByte() {
             return (byte) (ordinal() + 1);
@@ -159,7 +169,7 @@ public class PipesServer implements Runnable {
             PipesServer server =
                     new PipesServer(tikaConfig, System.in, System.out, maxForEmitBatchBytes,
                             serverParseTimeoutMillis, serverWaitTimeoutMillis);
-            System.setIn(new ByteArrayInputStream(new byte[0]));
+            System.setIn(new UnsynchronizedByteArrayInputStream(new byte[0]));
             System.setOut(System.err);
             Thread watchdog = new Thread(server, "Tika Watchdog");
             watchdog.setDaemon(true);
@@ -198,9 +208,10 @@ public class PipesServer implements Runnable {
         //initialize
         try {
             long start = System.currentTimeMillis();
-            initializeParser();
+            initializeResources();
             if (LOG.isTraceEnabled()) {
-                LOG.trace("timer -- initialize parser: {} ms", System.currentTimeMillis() - start);
+                LOG.trace("timer -- initialize parser and other resources: {} ms",
+                        System.currentTimeMillis() - start);
             }
             LOG.debug("pipes server initialized");
         } catch (Throwable t) {
@@ -259,10 +270,10 @@ public class PipesServer implements Runnable {
      */
     private String getContainerStacktrace(FetchEmitTuple t, List<Metadata> metadataList) {
         if (metadataList == null || metadataList.size() < 1) {
-            return "";
+            return StringUtils.EMPTY;
         }
         String stack = metadataList.get(0).get(TikaCoreProperties.CONTAINER_EXCEPTION);
-        return (stack != null) ? stack : "";
+        return (stack != null) ? stack : StringUtils.EMPTY;
     }
 
 
@@ -354,6 +365,8 @@ public class PipesServer implements Runnable {
     private void emitIt(FetchEmitTuple t, List<Metadata> metadataList) {
         long start = System.currentTimeMillis();
         String stack = getContainerStacktrace(t, metadataList);
+        //we need to apply this after we pull out the stacktrace
+        filterMetadata(metadataList);
         if (StringUtils.isBlank(stack) || t.getOnParseException() == FetchEmitTuple.ON_PARSE_EXCEPTION.EMIT) {
             injectUserMetadata(t.getMetadata(), metadataList);
             EmitKey emitKey = t.getEmitKey();
@@ -361,14 +374,13 @@ public class PipesServer implements Runnable {
                 emitKey = new EmitKey(emitKey.getEmitterName(), t.getFetchKey().getFetchKey());
                 t.setEmitKey(emitKey);
             }
-            EmitData emitData = new EmitData(t.getEmitKey(), metadataList);
+            EmitData emitData = new EmitData(t.getEmitKey(), metadataList, stack);
             if (maxForEmitBatchBytes >= 0 && emitData.getEstimatedSizeBytes() >= maxForEmitBatchBytes) {
                 emit(t.getId(), emitData, stack);
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("timer -- emitted: {} ms", System.currentTimeMillis() - start);
                 }
             } else {
-                //ignore the stack, it is stored in the emit data
                 write(emitData);
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("timer -- to write data: {} ms", System.currentTimeMillis() - start);
@@ -376,6 +388,16 @@ public class PipesServer implements Runnable {
             }
         } else {
             write(STATUS.PARSE_EXCEPTION_NO_EMIT, stack);
+        }
+    }
+
+    private void filterMetadata(List<Metadata> metadataList) {
+        for (Metadata m : metadataList) {
+            try {
+                tikaConfig.getMetadataFilter().filter(m);
+            } catch (TikaException e) {
+                LOG.warn("failed to filter metadata", e);
+            }
         }
     }
 
@@ -396,7 +418,7 @@ public class PipesServer implements Runnable {
         }
     }
 
-    private List<Metadata> parseIt(FetchEmitTuple t, Fetcher fetcher) {
+    protected List<Metadata> parseIt(FetchEmitTuple t, Fetcher fetcher) {
         FetchKey fetchKey = t.getFetchKey();
         if (fetchKey.hasRange()) {
             if (! (fetcher instanceof RangeFetcher)) {
@@ -497,6 +519,7 @@ public class PipesServer implements Runnable {
 
         String containerException = null;
         long start = System.currentTimeMillis();
+        preParse(fetchEmitTuple, stream, metadata, parseContext);
         try {
             autoDetectParser.parse(stream, handler, metadata, parseContext);
         } catch (SAXException e) {
@@ -516,11 +539,6 @@ public class PipesServer implements Runnable {
             if (containerException != null) {
                 metadata.add(TikaCoreProperties.CONTAINER_EXCEPTION, containerException);
             }
-            try {
-                tikaConfig.getMetadataFilter().filter(metadata);
-            } catch (TikaException e) {
-                LOG.warn("exception mapping metadata", e);
-            }
             if (LOG.isTraceEnabled()) {
                 LOG.trace("timer -- parse only time: {} ms", System.currentTimeMillis() - start);
             }
@@ -531,11 +549,14 @@ public class PipesServer implements Runnable {
     private List<Metadata> parseRecursive(FetchEmitTuple fetchEmitTuple,
                                           HandlerConfig handlerConfig, InputStream stream,
                                           Metadata metadata) {
+        //Intentionally do not add the metadata filter here!
+        //We need to let stacktraces percolate
         RecursiveParserWrapperHandler handler = new RecursiveParserWrapperHandler(
                 new BasicContentHandlerFactory(handlerConfig.getType(), handlerConfig.getWriteLimit()),
-                handlerConfig.getMaxEmbeddedResources(), tikaConfig.getMetadataFilter());
+                handlerConfig.getMaxEmbeddedResources());
         ParseContext parseContext = new ParseContext();
         long start = System.currentTimeMillis();
+        preParse(fetchEmitTuple, stream, metadata, parseContext);
         try {
             rMetaParser.parse(stream, handler, metadata, parseContext);
         } catch (SAXException e) {
@@ -553,6 +574,40 @@ public class PipesServer implements Runnable {
             }
         }
         return handler.getMetadataList();
+    }
+
+    private void preParse(FetchEmitTuple t, InputStream stream, Metadata metadata,
+                          ParseContext parseContext) {
+        TemporaryResources tmp = null;
+        try {
+            TikaInputStream tis = TikaInputStream.cast(stream);
+            if (tis == null) {
+                tis = TikaInputStream.get(stream, tmp, metadata);
+            }
+            _preParse(t.getId(), tis, metadata, parseContext);
+        } finally {
+            IOUtils.closeQuietly(tmp);
+        }
+        //do we want to filter the metadata to digest, length, content-type?
+        writeIntermediate(t.getEmitKey(), metadata);
+    }
+
+    private void _preParse(String id, TikaInputStream tis, Metadata metadata,
+                           ParseContext parseContext) {
+        if (digester != null) {
+            try {
+                digester.digest(tis, metadata, parseContext);
+            } catch (IOException e) {
+                LOG.warn("problem digesting: " + id, e);
+            }
+        }
+        try {
+            MediaType mt = detector.detect(tis, metadata);
+            metadata.set(Metadata.CONTENT_TYPE, mt.toString());
+            metadata.set(TikaCoreProperties.CONTENT_TYPE_PARSER_OVERRIDE, mt.toString());
+        } catch (IOException e) {
+            LOG.warn("problem detecting: " + id, e);
+        }
     }
 
     private void injectUserMetadata(Metadata userMetadata, List<Metadata> metadataList) {
@@ -581,7 +636,7 @@ public class PipesServer implements Runnable {
             byte[] bytes = new byte[length];
             input.readFully(bytes);
             try (ObjectInputStream objectInputStream = new ObjectInputStream(
-                    new ByteArrayInputStream(bytes))) {
+                    new UnsynchronizedByteArrayInputStream(bytes))) {
                 return (FetchEmitTuple) objectInputStream.readObject();
             }
         } catch (IOException e) {
@@ -595,19 +650,47 @@ public class PipesServer implements Runnable {
         return null;
     }
 
-    private void initializeParser() throws TikaException, IOException, SAXException {
+    protected void initializeResources() throws TikaException, IOException, SAXException {
         //TODO allowed named configurations in tika config
         this.tikaConfig = new TikaConfig(tikaConfigPath);
         this.fetcherManager = FetcherManager.load(tikaConfigPath);
-        this.emitterManager = EmitterManager.load(tikaConfigPath);
+        //skip initialization of the emitters if emitting
+        //from the pipesserver is turned off.
+        if (maxForEmitBatchBytes > -1) {
+            this.emitterManager = EmitterManager.load(tikaConfigPath);
+        } else {
+            LOG.debug("'maxForEmitBatchBytes' < 0. Not initializing emitters in PipesServer");
+            this.emitterManager = null;
+        }
         this.autoDetectParser = new AutoDetectParser(this.tikaConfig);
+        if (((AutoDetectParser)autoDetectParser).getAutoDetectParserConfig().getDigesterFactory() != null) {
+            this.digester = ((AutoDetectParser) autoDetectParser).
+                    getAutoDetectParserConfig().getDigesterFactory().build();
+            //override this value because we'll be digesting before parse
+            ((AutoDetectParser)autoDetectParser).getAutoDetectParserConfig().getDigesterFactory()
+                    .setSkipContainerDocument(true);
+        }
+        this.detector = ((AutoDetectParser)this.autoDetectParser).getDetector();
         this.rMetaParser = new RecursiveParserWrapper(autoDetectParser);
     }
 
 
+    private void writeIntermediate(EmitKey emitKey, Metadata metadata) {
+        try {
+            UnsynchronizedByteArrayOutputStream bos = UnsynchronizedByteArrayOutputStream.builder().get();
+            try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(bos)) {
+                objectOutputStream.writeObject(metadata);
+            }
+            write(STATUS.INTERMEDIATE_RESULT, bos.toByteArray());
+        } catch (IOException e) {
+            LOG.error("problem writing intermediate data (forking process shutdown?)", e);
+            exit(1);
+        }
+    }
+
     private void write(EmitData emitData) {
         try {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            UnsynchronizedByteArrayOutputStream bos = UnsynchronizedByteArrayOutputStream.builder().get();
             try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(bos)) {
                 objectOutputStream.writeObject(emitData);
             }

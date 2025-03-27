@@ -16,6 +16,7 @@
  */
 package org.apache.tika.parser.pdf;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -40,6 +41,7 @@ import org.apache.tika.extractor.ContainerExtractor;
 import org.apache.tika.extractor.ParserContainerExtractor;
 import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.Metadata;
+import org.apache.tika.metadata.PDF;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.parser.AutoDetectParser;
@@ -202,7 +204,7 @@ public class PDFParserTest extends TikaTest {
         assertEquals(3, tracker.filenames.size());
         assertEquals(3, tracker.mediaTypes.size());
         assertEquals("image1.emf", tracker.filenames.get(0));
-        assertNull(tracker.filenames.get(1));
+        assertEquals("attached.pdf", tracker.filenames.get(1));
         assertEquals("Test.docx", tracker.filenames.get(2));
         assertEquals(TYPE_EMF, tracker.mediaTypes.get(0));
         assertEquals(TYPE_PDF, tracker.mediaTypes.get(1));
@@ -467,4 +469,42 @@ public class PDFParserTest extends TikaTest {
         }
     }
 
+    @Test
+    public void testIncrementalUpdatesInAnAttachedPDF() throws Exception {
+        PDFParserConfig pdfParserConfig = new PDFParserConfig();
+        pdfParserConfig.setParseIncrementalUpdates(true);
+        ParseContext parseContext = new ParseContext();
+        parseContext.set(PDFParserConfig.class, pdfParserConfig);
+        List<Metadata> metadataList = getRecursiveMetadata("test-incremental-updates.eml", parseContext);
+        assertEquals(4, metadataList.size());
+        assertEquals(2, metadataList.get(3).getInt(PDF.PDF_INCREMENTAL_UPDATE_COUNT));
+        assertEquals(2,
+                metadataList.get(3).getInt(TikaCoreProperties.VERSION_COUNT));
+        long[] expected = new long[]{16242, 41226, 64872};
+        long[] eofs = metadataList.get(3).getLongValues(PDF.EOF_OFFSETS);
+        assertEquals(3, eofs.length);
+        assertArrayEquals(expected, eofs);
+
+        assertNotContained("Testing Incremental",
+                metadataList.get(1).get(TikaCoreProperties.TIKA_CONTENT));
+        assertContains("Testing Incremental",
+                metadataList.get(2).get(TikaCoreProperties.TIKA_CONTENT));
+        assertContains("Testing Incremental",
+                metadataList.get(3).get(TikaCoreProperties.TIKA_CONTENT));
+
+        assertNull(metadataList.get(0).get(PDF.INCREMENTAL_UPDATE_NUMBER));
+        assertNull(metadataList.get(3).get(PDF.INCREMENTAL_UPDATE_NUMBER));
+        assertEquals(0, metadataList.get(1).getInt(PDF.INCREMENTAL_UPDATE_NUMBER));
+        assertEquals(1, metadataList.get(2).getInt(PDF.INCREMENTAL_UPDATE_NUMBER));
+
+        assertEquals("/testPDF_incrementalUpdates.pdf/version-number-0",
+                metadataList.get(1).get(TikaCoreProperties.EMBEDDED_RESOURCE_PATH));
+        assertEquals("/testPDF_incrementalUpdates.pdf/version-number-1",
+                metadataList.get(2).get(TikaCoreProperties.EMBEDDED_RESOURCE_PATH));
+
+        assertEquals(TikaCoreProperties.EmbeddedResourceType.VERSION.toString(),
+                metadataList.get(1).get(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE));
+        assertEquals(TikaCoreProperties.EmbeddedResourceType.VERSION.toString(),
+                metadataList.get(2).get(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE));
+    }
 }

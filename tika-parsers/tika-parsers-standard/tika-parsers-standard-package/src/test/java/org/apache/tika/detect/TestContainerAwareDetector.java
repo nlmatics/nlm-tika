@@ -166,6 +166,13 @@ public class TestContainerAwareDetector extends MultiThreadedTikaTest {
         assertTypeByData("testDGN8.dgn", "image/vnd.dgn; version=8");
     }
 
+    @Test
+    @Disabled("until we have an actual hwpx example file in our repo")
+    public void testHWPX() throws Exception {
+        assertTypeByData("testHWPX.hwpx", "application/hwp+zip");
+        assertTypeByNameAndData("testHWPX.hwpx", "application/hwp+zip");
+    }
+
     /**
      * There is no way to distinguish "proper" StarOffice files from templates.
      * All templates have the same extension but their actual type depends on
@@ -255,6 +262,11 @@ public class TestContainerAwareDetector extends MultiThreadedTikaTest {
         assertTypeByData("testODTnotaZipFile.odt", "text/plain");
     }
 
+    @Test
+    public void test3MF() throws Exception {
+        assertTypeByData("test3mf.3mf", "application/vnd.ms-package.3dmanufacturing-3dmodel+xml");
+        assertTypeByNameAndData("test3mf.3mf", "application/vnd.ms-package.3dmanufacturing-3dmodel+xml");
+    }
     @Test
     public void testODFDifferentOrder() throws Exception {
         //TIKA-3356

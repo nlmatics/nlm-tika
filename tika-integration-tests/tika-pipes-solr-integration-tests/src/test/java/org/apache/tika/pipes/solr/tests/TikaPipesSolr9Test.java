@@ -16,11 +16,14 @@
  */
 package org.apache.tika.pipes.solr.tests;
 
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+@Testcontainers(disabledWithoutDocker = true)
 public class TikaPipesSolr9Test extends TikaPipesSolrTestBase {
 
     @Override
     public String getSolrImageName() {
-        return "solr:9.0";
+        return "solr:9.1";
     }
 
     @Override

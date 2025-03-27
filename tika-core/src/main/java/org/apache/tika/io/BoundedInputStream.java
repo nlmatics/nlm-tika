@@ -121,5 +121,16 @@ public class BoundedInputStream extends InputStream {
     public boolean hasHitBound() {
         return pos >= max;
     }
+
+    @Override
+    public int available() throws IOException {
+        return in.available();
+    }
+
+    @Override
+    public boolean markSupported() {
+        return in.markSupported();
+    }
+
 }
 

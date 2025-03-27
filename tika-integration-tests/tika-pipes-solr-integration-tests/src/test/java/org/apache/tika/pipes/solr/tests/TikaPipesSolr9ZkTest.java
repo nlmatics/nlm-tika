@@ -16,21 +16,23 @@
  */
 package org.apache.tika.pipes.solr.tests;
 
-import static org.junit.Assume.assumeTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import org.junit.BeforeClass;
-import org.junit.Ignore;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import org.apache.tika.utils.SystemUtils;
 
-@Ignore("until we can fix SessionExpiredException")
+@Disabled("until we can fix SessionExpiredException")
+@Testcontainers(disabledWithoutDocker = true)
 public class TikaPipesSolr9ZkTest extends TikaPipesSolr9Test {
 
-    @BeforeClass
+    @BeforeAll
     public static void setUp() {
-        assumeTrue("zk test only works on linux (and not mac os x)",
-                SystemUtils.IS_OS_UNIX && ! SystemUtils.IS_OS_MAC_OSX);
+        assumeTrue(
+                SystemUtils.IS_OS_UNIX && !SystemUtils.IS_OS_MAC_OSX,
+                "zk test only works on linux (and not mac os x)");
     }
 
     @Override
