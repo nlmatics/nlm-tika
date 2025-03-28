@@ -255,6 +255,7 @@ class AbstractPDF2XHTML extends PDFTextStripper {
             String pageDims = "height:" + bBox.getHeight() + "px; width:" + bBox.getWidth() + "px;";
             attrs.addAttribute("", "style", "style", "CDATA", pageDims + " position: relative;border: 1px solid red;");
             xhtml.startElement("div", attrs);
+            
             // xhtml.startElement("div", "class", "page");
         } catch (SAXException e) {
             throw new IOException("Unable to start a page", e);
@@ -1218,7 +1219,7 @@ class AbstractPDF2XHTML extends PDFTextStripper {
         }
 
         xhtml.startElement("div", "class", "acroform");
-        xhtml.startElement("ol");
+        // xhtml.startElement("ol");
 
         while (itr.hasNext()) {
             Object obj = itr.next();
@@ -1226,7 +1227,7 @@ class AbstractPDF2XHTML extends PDFTextStripper {
                 processAcroField((PDField) obj, 0);
             }
         }
-        xhtml.endElement("ol");
+        // xhtml.endElement("ol");
         xhtml.endElement("div");
     }
 
@@ -1258,12 +1259,26 @@ class AbstractPDF2XHTML extends PDFTextStripper {
         addFieldString(field);
         if (field instanceof PDNonTerminalField) {
             int r = currentRecursiveDepth + 1;
-            xhtml.startElement("ol");
+            // xhtml.startElement("ol");
             for (PDField child : ((PDNonTerminalField) field).getChildren()) {
                 processAcroField(child, r);
             }
-            xhtml.endElement("ol");
+            // xhtml.endElement("ol");
         }
+    }
+    private int findPageForWidget(PDAnnotationWidget widget) {
+        for (int i = 0; i < pdDocument.getNumberOfPages(); i++) {
+            PDPage page = pdDocument.getPage(i);
+            try {
+                if (page.getAnnotations().contains(widget)) {
+                    return i;
+                }
+            } catch (IOException e) {
+                //swallow
+                continue;
+            }
+        }
+        return -1;
     }
 
     private void addFieldString(PDField field) throws SAXException {
@@ -1280,7 +1295,31 @@ class AbstractPDF2XHTML extends PDFTextStripper {
         }
         if (altName != null) {
             attrs.addAttribute("", "altName", "altName", "CDATA", altName);
+            attrs.addAttribute("", "name", "name", "CDATA", field.getFullyQualifiedName());
         }
+        // System.out.println("Field: " + field.getFullyQualifiedName() + field.getFieldType());
+        // PDRectangle bBox = page.getBBox();
+        if (field.getWidgets() != null && field.getWidgets().size() > 0) {
+            PDRectangle bBox = field.getWidgets().get(0).getRectangle();
+            String fieldType = "text";
+            if (field.getFieldType() == "Tx") {
+                fieldType = "text";
+            } else if (field.getFieldType() == "Ch") {
+                fieldType = "checkbox";
+            } else if (field.getFieldType() == "Btn") {
+                fieldType = "radio";
+            }
+            float x = bBox.getLowerLeftX();
+            int pageId = findPageForWidget(field.getWidgets().get(0));
+            float y = pdDocument.getPage(pageId).getBBox().getHeight() - bBox.getLowerLeftY() - bBox.getHeight();
+            attrs.addAttribute("", "pageId", "pageId", "CDATA", Integer.toString(pageId));
+            attrs.addAttribute("", "type", "type", "CDATA", fieldType);
+            String fieldDims = "top:" + y + "px;left:" + x + "px;height:" + bBox.getHeight() + "px; width:" + bBox.getWidth() + "px;";
+            attrs.addAttribute("", "style", "style", "CDATA", fieldDims + " position: absolute;border: 1px solid red;");
+        } else {
+            attrs.addAttribute("", "type", "type", "CDATA", "text");
+        }
+
         //return early if PDSignature field
         if (field instanceof PDSignatureField) {
             handleSignature(attrs, (PDSignatureField) field);
@@ -1292,9 +1331,9 @@ class AbstractPDF2XHTML extends PDFTextStripper {
         }
 
         if (attrs.getLength() > 0 || sb.length() > 0) {
-            xhtml.startElement("li", attrs);
-            xhtml.characters(sb.toString());
-            xhtml.endElement("li");
+            xhtml.startElement("input", attrs);
+            // xhtml.characters(sb.toString());
+            xhtml.endElement("input");
         }
     }
 
